@@ -7,7 +7,7 @@
 *Videos made **with** LLMs, tracked across platforms: who made them, who reposted them, and how the pixels were produced.*
 
 <!-- snapshot:summary -->
-> **快照 2026-09-26**：候选帖子 2,048 条（B站 815，YouTube 1，X 1,232；其中 X 的 1,081 条来自 athemeroy 仓库，本项目未逐条筛选）。已筛选 974 条，确认为大模型参与制作的作品 521 件，在各平台共出现 537 次，其中上传者自己声明是转载的 33 次，筛选判为疑似转载、尚未找到原作的 22 次。筛选只看了文字，没有看画面，结论都有待人工复核。
+> **快照 2026-09-26**：候选帖子 2,048 条（B站 815，YouTube 1，X 1,232；其中 X 的 1,081 条来自 athemeroy 仓库，他们人工审过的案例已转成本项目的标签，其余 928 条本项目没有筛选）。已筛选 1,120 条，确认为大模型参与制作的作品 669 件，在各平台共出现 685 次，其中上传者自己声明是转载的 33 次，筛选判为疑似转载、尚未找到原作的 22 次。初筛只看文字；206 件作品有人看过抽帧（athemeroy 审核或本项目复核），其余结论有待人工复核。
 <!-- /snapshot:summary -->
 
 ## 章节
@@ -21,19 +21,19 @@
 每个类别取证据等级最高、播放量最高的 5 件。完整列表见各章节和 [`data/works.csv`](data/works.csv)。
 
 <!-- works:start -->
-### 代码绘制的 2D 动画（95）
+### 代码绘制的 2D 动画（139）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
 | P(doom) 音乐 MV | John Heibel | Opus 5.5 | [YouTube](https://youtu.be/8j-hR4fJywU) · [X](https://x.com/other__reality/status/2102514581684052169) · [B站（转载）](https://www.bilibili.com/video/BV1EDhW6LEYU) · [B站（转载）](https://www.bilibili.com/video/BV1WYhy67EQk) | A |
+| 蚂蚁群落代码动画 | @hanifproduktif | Opus 5.5 | [X](https://x.com/hanifproduktif/status/2102742924148830211) | A |
+| Shaml 纸雕夜景短片 | @makwired | Opus 5.5 | [X](https://x.com/makwired/status/2103008945220567166) | A |
 | Astra图像分层2D动画 | wu_tian吴天 | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV195bu6REvm) | A* |
-| 月形水上前端动画复刻 | Ulchemist | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV14aYL6GEbx) | A* |
-| 小鲸鱼旅行短片 | MRDave先生 | DeepSeek V4.1 | [B站](https://www.bilibili.com/video/BV1mbh26ZE9p) | A* |
-| 中秋拼贴动画 | @ring_hyacinth | Opus 5.5 | [X](https://x.com/ring_hyacinth/status/2102986085328716066) · [B站（转载）](https://www.bilibili.com/video/BV1wsag6UEFR) · [X（疑似转载）](https://x.com/NFT_Chen/status/2103380404791333144) | B |
+| 月行水上前端动画复刻 | Ulchemist | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV14aYL6GEbx) | A* |
 
-其余 90 件见 [`data/works.csv`](data/works.csv)。
+其余 134 件见 [`data/works.csv`](data/works.csv)。
 
-### 教学讲解（25）
+### 教学讲解（48）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
@@ -43,33 +43,33 @@
 | 星舰科普视频 | 风之谷AI | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1VxhD6jE5V) | B |
 | 20分钟罗马帝国史 | Levius在思考 | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1QWau68ENA) | B |
 
-其余 20 件见 [`data/works.csv`](data/works.csv)。
+其余 43 件见 [`data/works.csv`](data/works.csv)。
 
-### 3D 与实时图形（102）
+### 3D 与实时图形（121）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
+| Clearwater实时水面 | @Aurelien_Gz | Opus 5.5 | [X](https://x.com/Aurelien_Gz/status/2102786378282987591) | A |
 | BA教室程序化建模 | 死夢めぐり | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1oRhU6mE9T) | A* |
+| Pip纸片立体书冒险 | @lemomo_ai | Opus 5.5 | [X](https://x.com/lemomo_ai/status/2103123634634309799) | A* |
 | 蓬皮杜建筑短片 | @ZHO_ZHO_ZHO | GPT-6 Astra | [X](https://x.com/ZHO_ZHO_ZHO/status/2099894689319334301) | B |
 | Astra操控电脑做3D角色 | @e_page | GPT-6 Astra | [X](https://x.com/e_page/status/2103059390614188063) | B |
-| Astra Blender动画参考 | @YuanA41755085 | GPT-6 Astra | [X](https://x.com/YuanA41755085/status/2098745235732152776) | B |
-| 日式微缩场景三渲二 | AneMoeMian | Opus 5.5 | [B站](https://www.bilibili.com/video/BV14Sh16sEew) | B |
 
-其余 97 件见 [`data/works.csv`](data/works.csv)。
+其余 116 件见 [`data/works.csv`](data/works.csv)。
 
-### 改编现有素材（22）
+### 改编现有素材（53）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
 | 极乐净土3D转2D骨骼动画 | 美神自由梦 | GPT-6 | [B站](https://www.bilibili.com/video/BV1Lkh467E6h) | A* |
+| 真人口播改线稿动画讲解 | @AxtonLiu | Opus 5.5 | [X](https://x.com/AxtonLiu/status/2102827887732932956) | B |
 | 哈基米鬼畜《学猫叫》 | yxlllc | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1gihX67EhZ) | B |
-| 插画绘制过程重建 | Airi_dynamic | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1aJbp6fECw) | C |
-| AE像素级还原动态设计 | GregTech_格雷 | GPT-6 | [B站](https://www.bilibili.com/video/BV1stbj6FEax) | C |
-| 真人口播转线稿动画 | @AxtonLiu | Opus 5.5 | [X](https://x.com/AxtonLiu/status/2102827887732932956) | C |
+| La Redonda球员推荐竖版片 | @Luchigatica | Opus 5.5 | [X](https://x.com/Luchigatica/status/2102853289259729328) | B |
+| 文章转西语产品讲解 | @Oscar_sanmillan | Opus 5.5 | [X](https://x.com/Oscar_sanmillan/status/2103114698610683964) | B |
 
-其余 17 件见 [`data/works.csv`](data/works.csv)。
+其余 48 件见 [`data/works.csv`](data/works.csv)。
 
-### 调度外部视频模型（10）
+### 调度外部视频模型（18）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
@@ -77,33 +77,33 @@
 | 停车场演唱会MV | TigeriiZ周大老虎 | GPT-6 Astra、GPT-6 Pro | [B站](https://www.bilibili.com/video/BV1ShbV68EQL) | B |
 | 《最后一处脏》短片 | 大师兄酱啊 | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1GthU6TEss) | B |
 | MiniMax H3舞蹈动作迁移 | Robert_V | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1b9hS6MEqs) | B |
-| Astra+Seedance玩法 | @servasyy_ai | GPT-6 Astra | [X（疑似转载）](https://x.com/servasyy_ai/status/2096107848333947020) | C |
+| 鱿鱼游戏草模转 Seedance | @OriSilver | Opus 5.5 | [X](https://x.com/OriSilver/status/2102817977812824335) | B |
 
-其余 5 件见 [`data/works.csv`](data/works.csv)。
+其余 13 件见 [`data/works.csv`](data/works.csv)。
 
-### 程序与游戏录屏（73）
+### 程序与游戏录屏（84）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
+| 远近捡罐效率实验 | @masaya_1980 | Opus 5.5 | [X](https://x.com/masaya_1980/status/2103115017755500561) | A |
 | GTA6网页版（支持手柄） | SurvivorEllie | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1AMaw6tEw7) | A* |
 | 鹈鹕骑车平台小游戏 | Cajun_ | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1NMh86MENk) | A* |
 | 宝可梦HD-2D风格游戏 | 白面汤圆王子 | GPT-6 | [B站](https://www.bilibili.com/video/BV1e7bp6cEwi) | B |
 | 艾尔登法环风ARPG | イービルブロッコリー | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1u9YE6REEv) | B |
-| Apex风低多边形游戏 | Shio00O | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1CKbP6dEWv) | B |
 
-其余 68 件见 [`data/works.csv`](data/works.csv)。
+其余 79 件见 [`data/works.csv`](data/works.csv)。
 
-### 混合或未说明（194）
+### 混合或未说明（206）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
-| P3明日方舟PV复刻 | NikusonP | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1eHY76ZEPa) | A* |
-| 动效设计师作品集短片 | @ajith_io | Opus 5.5 | [X](https://x.com/ajith_io/status/2103449416325890146) | B |
-| 一句话沙画动画 | @Michaelzsguo | Opus 5.5 | [X](https://x.com/Michaelzsguo/status/2102592355165782312) | B |
+| 东方版P3R PV复刻 | NikusonP | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1eHY76ZEPa) | A* |
 | Opus自由发挥惊叹作品 | @AxtonLiu | Opus 5.5 | [X](https://x.com/AxtonLiu/status/2103288413969621231) | B |
 | 超越Astra感受2D动画 | @Bhavani_00007 | Opus 5.5 | [X](https://x.com/Bhavani_00007/status/2102489249371259121) | B |
+| world.execute(me) MV | SeASnAkEss | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1RHhU63ESq) | B |
+| CapCut剪辑主题动画 | @Gorden_Sun | Opus 5.5 | [X](https://x.com/Gorden_Sun/status/2103509008049144287) | B |
 
-其余 189 件见 [`data/works.csv`](data/works.csv)。
+其余 201 件见 [`data/works.csv`](data/works.csv)。
 <!-- works:end -->
 
 ## 收什么，不收什么
@@ -129,6 +129,7 @@
 | [`data/appearances.csv`](data/appearances.csv) | 作品在各平台的出现记录，含转载状态 |
 | [`data/candidates/`](data/candidates/) | 搜索命中的全部帖子，以及每条的筛选结果 |
 | [`data/triage/`](data/triage/) | 每条候选的筛选标签 |
+| [`data/review/`](data/review/) | 复核记录：做法、代码链接核对、B 站抽帧所见 |
 | [`data/work_links.csv`](data/work_links.csv) | 人工确认的跨平台关联及依据 |
 | [`data/receipts/`](data/receipts/) | 每次采集的查询回执 |
 
@@ -138,6 +139,7 @@
 python3 scripts/bilibili.py                 # 采集 B 站
 python3 scripts/prepare_triage.py bilibili  # 切分待筛选候选
 # 按 scripts/triage/PROMPT.md 生成 data/triage/*.labels.jsonl
+# 按 scripts/review/REVIEW.md 复核，生成 data/review/*.jsonl
 python3 scripts/propose_links.py            # 提出跨平台关联候选，人工确认后写入 data/work_links.csv
 python3 scripts/build.py                    # 生成作品表与本页表格
 ```

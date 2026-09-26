@@ -45,3 +45,21 @@
 - 只根据给出的文字判断，不要推测看不到的内容。
 - 一句话生成、耗时、费用这类说法，一律写成"作者称"。
 - 如果一行文字里写到了别的作者，比如"@xxx 做的""转自 xxx"，要写进 `source_hint`。
+
+## athemeroy 人工审核案例（`x_seed_*.jsonl`）
+
+这批输入是 athemeroy 人工审过的案例，多了这几个字段：`athemeroy_label`、`athemeroy_primary_path`、`creator_disclosure`（作者公开的做法、提示词、代码仓库）、`observation`（对方看抽帧写下的画面描述）、`review_note`（对方的审核结论）。`title` 只是一句英文主题，不是帖子正文。
+
+判断时以这几段英文为准，照常输出上面的全部字段，另外：
+
+- `category`：这些都是对方确认过的作品，一般是 `work`；画面是多个模型并排对比的，填 `comparison`。只有审核结论明确说视频不是模型做的，才填别的类别。
+- `primary_path`：默认沿用 `athemeroy_primary_path`，除非审核结论和它明显矛盾。
+- `evidence`：`creator_disclosure` 或 `review_note` 写明对方打开了作者公开的源码、并确认和视频对得上的，填 `A`，同时加一个字段 `"verified_by": "athemeroy"`。只附了仓库链接、没写核对结果的，填 `A`，但不加 `verified_by`。其余照上面的标准判断。
+- `repost`：作者本人发布的填 `original_claimed`；审核结论说是转发别人作品的，按实际情况填。
+- `models`：没有提到别的模型时填 `["claude-opus-5-5"]`，提到的其他语言模型也要列上，图像模型和视频模型不算。
+- `note`：用中文写清楚依据，比如"作者公开 Clearwater 源码，对方核对为浏览器实时渲染"。
+- 另加 `observed_zh`：不超过 40 个字，用中文概括 `observation`。
+
+## 做法摘要（证据为 A 或 B 的作品）
+
+证据填了 `A` 或 `B` 的作品，另加一个字段 `method_zh`，不超过 120 个字，用中文写清楚这件作品实际是怎么做出来的：用了什么模型、什么工具链（比如 p5.js、Three.js、Remotion、Blender、ffmpeg、Seedance）、作者自己报的耗时和费用、提示词有多长、有没有参考素材。只写输入里有的内容，作者说的一律写成"作者称"。

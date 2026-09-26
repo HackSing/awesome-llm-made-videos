@@ -4,6 +4,7 @@
 Inputs
   data/candidates/*.csv                   what the collectors found
   data/triage/*.labels.jsonl              triage output (scripts/triage/PROMPT.md)
+  data/review/*.jsonl                     second-pass notes (method, frames seen, code checked) laid over triage
   data/triage/manual.labels.jsonl         hand-written labels; loaded last, so they win
   data/work_links.csv                     hand-curated merges: appearance_id -> work_id, with basis
 
@@ -26,7 +27,7 @@ from _common import CANDIDATE_FIELDS, CANDIDATES, DATA, ROOT, iso, read_csv, utc
 
 WORK_FIELDS = [
     "work_id", "kind", "title", "creator", "creator_url", "original_url", "first_published_utc", "models",
-    "primary_path", "evidence_level", "evidence_links", "creator_claims", "observed", "review_note",
+    "primary_path", "evidence_level", "evidence_links", "creator_claims", "observed", "method", "review_note",
     "reviewed_utc",
 ]
 APPEARANCE_FIELDS = [
@@ -37,8 +38,8 @@ MODEL_NAMES = {
     "claude-opus-5-5": "Opus 5.5", "gpt-6-sol": "GPT-6 Sol", "gpt-6-luna": "GPT-6 Luna",
     "gpt-6-astra": "GPT-6 Astra", "gpt-6": "GPT-6", "gpt-6-pro": "GPT-6 Pro",
     "claude": "Claude（版本未说明）", "claude-fable-5-1": "Fable 5.1", "grok-4-7": "Grok 4.7",
-    "gemini-4-pro": "Gemini 4 Pro", "gemini-3-pro": "Gemini 3 Pro",
-    "gpt-5-6-luna": "GPT-5.6 Luna", "gpt-5-6-sol": "GPT-5.6 Sol",
+    "gemini-4-pro": "Gemini 4 Pro", "gemini-3-pro": "Gemini 3 Pro", "gemini-3-8": "Gemini 3.8",
+    "gpt-5-6-luna": "GPT-5.6 Luna", "gpt-5-6-sol": "GPT-5.6 Sol", "gpt-5-6": "GPT-5.6（型号未说明）",
     "claude-opus-5": "Opus 5", "gpt": "GPT（版本未说明）", "openai-codex": "Codex（模型未说明）",
     "gemini": "Gemini（版本未说明）", "deepseek": "DeepSeek（版本未说明）", "deepseek-v4-1": "DeepSeek V4.1",
     "deepseek-v4-1-flash": "DeepSeek V4.1 Flash", "doubao": "豆包（版本未说明）", "doubao-2-1-lite": "豆包 2.1 Lite",
@@ -69,18 +70,37 @@ REPOSTS = {"declared_repost", "uncredited_repost", "suspected_repost"}
 REPOST_TAGS = {"declared_repost": "（转载）", "uncredited_repost": "（未署名转载）", "suspected_repost": "（疑似转载）"}
 
 
+def read_jsonl(path):
+    return [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
+
+
 def load_labels():
+    """Triage labels, then manual labels (they replace), then review overlays (data/review/*.jsonl).
+
+    A review overlay adds what a second pass found (method_zh, observed_zh, checked
+    code links) to an existing label. It may lower a triage label's evidence, never
+    raise it to A, and never touches the evidence of a hand-written label.
+    """
     labels = {}
     paths = sorted(glob.glob(str(DATA / "triage" / "*.labels.jsonl")))
-    paths.sort(key=lambda p: p.endswith("manual.labels.jsonl"))
-    for path in paths:
-        manual = path.endswith("manual.labels.jsonl")
-        for line in open(path, encoding="utf-8"):
-            if line.strip():
-                lab = json.loads(line)
-                if lab["evidence"] == "A" and not manual:
-                    lab["evidence"] = "A*"
-                labels[lab["appearance_id"]] = lab
+    manual = [p for p in paths if p.endswith("manual.labels.jsonl")]
+    for path in [p for p in paths if p not in manual] + manual:
+        for lab in read_jsonl(path):
+            labels[lab["appearance_id"]] = dict(lab, manual=path in manual)
+    for path in sorted(glob.glob(str(DATA / "review" / "*.jsonl"))):
+        for extra in read_jsonl(path):
+            lab = labels.get(extra["appearance_id"])
+            if not lab:
+                continue
+            extra = {k: v for k, v in extra.items() if v not in ("", None)}
+            if lab["manual"] or extra.get("evidence") == "A":
+                extra.pop("evidence", None)
+            lab.update(extra)
+    for lab in labels.values():
+        # A needs someone to have checked the code against the video: us by hand,
+        # or athemeroy in a reviewed case they say they verified
+        if lab["evidence"] == "A" and not lab["manual"] and not lab.get("verified_by"):
+            lab["evidence"] = "A*"
     return labels
 
 
@@ -162,8 +182,10 @@ def main():
             "evidence_level": best_evidence,
             "evidence_links": " ".join(sorted(filter(None, {it[0]["desc_links"] for it in items}))),
             "creator_claims": lab.get("note", ""),
-            "observed": f"duration_s={r['duration_s']}" if r["duration_s"] else "",
-            "review_note": f"triage category={lab['category']} llm_made={lab['llm_made']}",
+            "observed": "; ".join(filter(None, [lab.get("observed_zh", ""), f"duration_s={r['duration_s']}" if r["duration_s"] else ""])),
+            "method": next((it[1]["method_zh"] for it in items if it[1].get("method_zh")), ""),
+            "review_note": f"triage category={lab['category']} llm_made={lab['llm_made']}"
+            + (f"; verified_by={lab['verified_by']}" if lab.get("verified_by") else ""),
             "reviewed_utc": previous.get(work_id, {}).get("reviewed_utc") or now,
         }
 
@@ -208,6 +230,7 @@ def main():
         "triaged": len(labels),
         "by_platform": {p: sum(1 for a in appearances if a["platform"] == p) for p in PLATFORM_NAMES},
         "reposts": sum(1 for a in appearances if a["repost_status"] in REPOSTS),
+        "evidence": {e: sum(1 for w in works.values() if w["evidence_level"] == e) for e in EVIDENCE_ORDER},
         "by_repost_status": {k: sum(1 for a in appearances if a["repost_status"] == k) for k in sorted(REPOSTS)},
     }
     (DATA / "build-summary.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2) + "\n", "utf-8")
@@ -217,16 +240,20 @@ def main():
     for p in sorted(CANDIDATES.glob("*.csv")):
         for r in read_csv(p):
             cand[r["platform"]].append(r)
-    seed_only = sum(1 for r in cand.get("x", []) if all(q.startswith("seed:") for q in r["matched_queries"].split(";") if q))
+    seed_only = [r for r in cand.get("x", []) if all(q.startswith("seed:") for q in r["matched_queries"].split(";") if q)]
+    seed_unlabelled = sum(1 for r in seed_only if r["appearance_id"] not in labels)
+    seen_frames = sum(1 for w in works.values() if any(
+        labels[a["appearance_id"]].get("observed_zh") for a in apps_by_work[w["work_id"]] if a["appearance_id"] in labels))
     date = now[:10]
     per_platform = "，".join(f"{PLATFORM_NAMES.get(k, k)} {len(v):,}" for k, v in cand.items())
     summary = (
         f"> **快照 {date}**：候选帖子 {sum(len(v) for v in cand.values()):,} 条（{per_platform}；"
-        f"其中 X 的 {seed_only:,} 条来自 athemeroy 仓库，本项目未逐条筛选）。"
+        f"其中 X 的 {len(seed_only):,} 条来自 athemeroy 仓库，他们人工审过的案例已转成本项目的标签，"
+        f"其余 {seed_unlabelled:,} 条本项目没有筛选）。"
         f"已筛选 {len(labels):,} 条，确认为大模型参与制作的作品 {len(works)} 件，"
         f"在各平台共出现 {len(appearances)} 次，其中上传者自己声明是转载的 {stats['by_repost_status']['declared_repost']} 次，"
         f"筛选判为疑似转载、尚未找到原作的 {stats['by_repost_status']['suspected_repost']} 次。"
-        f"筛选只看了文字，没有看画面，结论都有待人工复核。"
+        f"初筛只看文字；{seen_frames} 件作品有人看过抽帧（athemeroy 审核或本项目复核），其余结论有待人工复核。"
     )
 
     def fill(text, tag, body):

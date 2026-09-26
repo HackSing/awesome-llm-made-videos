@@ -7,8 +7,12 @@
 X rows that only come from the athemeroy seed are skipped: that project already
 reviewed or classified them. Only posts our own searches surfaced are triaged.
 
+`x_seed` is the exception: the 160 cases athemeroy reviewed by hand (frames, the
+creator's disclosure, source code where there is some). Their notes are passed in so
+the labeller can carry the review over instead of guessing from a one-line topic.
+
 Usage:
-  python3 scripts/prepare_triage.py x bilibili [--chunk 150]
+  python3 scripts/prepare_triage.py x bilibili x_seed [--chunk 150]
 """
 
 import argparse
@@ -17,6 +21,7 @@ import json
 import re
 
 from _common import CANDIDATES, RAW, read_csv
+from import_seed_athemeroy import fetch_csv, status_parts
 
 TRIAGE = RAW / "triage"
 TAG_RE = re.compile(r"<[^>]+>")
@@ -37,7 +42,27 @@ def bilibili_desc():
     return desc
 
 
+def seed_case_rows():
+    """athemeroy's reviewed cases, joined to our candidate row (pinned commit, see import_seed_athemeroy.py)."""
+    cands = {r["appearance_id"]: r for r in read_csv(CANDIDATES / "x.csv")}
+    out = []
+    for c in fetch_csv("data/cases.csv"):
+        r = cands.get(f"x:{status_parts(c['source_url'])[1]}")
+        if not r:
+            continue
+        out.append({
+            "appearance_id": r["appearance_id"], "platform": "x", "url": r["url"], "uploader": r["uploader"],
+            "title": r["title"], "published_utc": r["published_utc"], "duration_s": r["duration_s"],
+            "athemeroy_label": c["label"], "athemeroy_primary_path": c["primary_path"],
+            "creator_disclosure": c["creator_disclosure"], "observation": c["hypit_observation"],
+            "review_note": c["review_note"],
+        })
+    return out
+
+
 def rows_for(platform):
+    if platform == "x_seed":
+        return seed_case_rows()
     rows = [r for r in read_csv(CANDIDATES / f"{platform}.csv") if r.get("review_status") == "pending"]
     if platform == "x":
         rows = [r for r in rows if any(not q.startswith("seed:") for q in r["matched_queries"].split(";") if q)]
