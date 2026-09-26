@@ -1,0 +1,126 @@
+{
+  "launch": "2026-09-opus-5-5-gpt-6",
+  "window_start_utc": "2026-09-03T00:00:00Z",
+  "models": {
+    "claude-opus-5-5": {
+      "name": "Claude Opus 5.5",
+      "released": "2026-09-22",
+      "match": "opus[\\s\\-_]*5[\\s.\\-_]?5"
+    },
+    "gpt-6-sol": {
+      "name": "GPT-6 Sol",
+      "released": "2026-09-22",
+      "match": "gpt[\\s\\-_]*6[\\s\\-_]*sol"
+    },
+    "gpt-6-luna": {
+      "name": "GPT-6 Luna",
+      "released": "2026-09-22",
+      "match": "gpt[\\s\\-_]*6[\\s\\-_]*luna"
+    },
+    "gpt-6-astra": {
+      "name": "GPT-6 Astra",
+      "released": "2026-09-03",
+      "match": "gpt[\\s\\-_]*6[\\s\\-_]*astra"
+    },
+    "gpt-6": {
+      "name": "GPT-6 (variant unstated)",
+      "released": "2026-09-03",
+      "match": "gpt[\\s\\-_]*6(?!\\d|\\.\\d)",
+      "fallback_for": [
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-6-astra"
+      ]
+    }
+  },
+  "bilibili": {
+    "orders": {
+      "pubdate": 10,
+      "click": 5
+    },
+    "queries": [
+      "opus 5.5",
+      "opus5.5",
+      "claude opus 5.5",
+      "opus 5.5 动画",
+      "opus5.5 动画",
+      "opus 5.5 视频",
+      "opus 5.5 MV",
+      "opus 5.5 一句话",
+      "opus 5.5 短片",
+      "opus 5.5 代码 动画",
+      "GPT-6 Sol",
+      "GPT6 Sol 动画",
+      "GPT-6 动画",
+      "GPT-6 一句话",
+      "GPT-6 Astra 动画",
+      "GPT-6 Luna"
+    ]
+  },
+  "x": {
+    "note": "Browser-only, maintainer's session. Per session <=15 queries, per day <=40; 40-120 s between queries. Opus 5.5 coverage up to 2026-09-25 15:21 UTC comes from the athemeroy seed. Latest/live mode was tried once and dropped: at a human scroll pace it only reaches the last few minutes of posts, so date-windowed Top queries are used instead.",
+    "screens": 10,
+    "queries": [
+      [
+        "\"Opus 5.5\" filter:videos",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-25",
+        "live"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-25",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" 视频 filter:videos",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" 动画 filter:videos since:2026-09-25",
+        "top"
+      ],
+      [
+        "\"GPT-6 Sol\" filter:videos",
+        "top"
+      ],
+      [
+        "\"GPT-6\" animation filter:videos",
+        "top"
+      ],
+      [
+        "\"GPT-6 Astra\" filter:videos",
+        "top"
+      ],
+      [
+        "\"GPT-6 Luna\" filter:videos",
+        "top"
+      ],
+      [
+        "\"GPT-6\" 动画 filter:videos",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" \"GPT-6\" filter:videos",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" アニメ filter:videos since:2026-09-25",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" animation filter:videos since:2026-09-25",
+        "top"
+      ],
+      [
+        "\"GPT-6\" video filter:videos",
+        "top"
+      ]
+    ]
+  }
+}

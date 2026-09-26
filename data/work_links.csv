@@ -1,0 +1,28 @@
+appearance_id,work_id,repost_status,basis
+bilibili:BV1EDhW6LEYU,youtube-8j-hR4fJywU,declared_repost,B站简介写明 up 未实测、源码为 GitHub PDoomVideo；该仓库 README 由作者 John Heibel 维护并链接 YouTube 原片
+youtube:8j-hR4fJywU,youtube-8j-hR4fJywU,original_claimed,GitHub 仓库 JohnHeibel/PDoomVideo 的 README 称这是该源码生成的 MV 并链接此视频；上传频道（B 站转载称为 OtherReality）与 John Heibel 是否同一人未核实
+x:2103380404791333144,x-2102986085328716066,suspected_repost,文案与 @ring_hyacinth 9/24 帖几乎逐字相同、晚一天发布；@ring_hyacinth 9/25 称昨天分享了拼贴画版本。未对比视频，暂不定为未注明转载
+x:2102986085328716066,x-2102986085328716066,original_claimed,@ring_hyacinth 第一人称说明脚本和音乐由自己提供、动画由 Opus 5.5 绘制
+x:2102514581684052169,youtube-8j-hR4fJywU,unknown,时长 156.6 秒与原曲一致；两条 B 站转载把原作指向 @other__reality / OtherReality；athemeroy 记录其流程与 PDoomVideo 相符但未核实归属
+bilibili:BV1WYhy67EQk,youtube-8j-hR4fJywU,declared_repost,B 站简介注明来源为 YouTube OtherReality 8j-hR4fJywU，即 PDoomVideo README 链接的同一视频
+bilibili:BV1K8h963E5D,x-2103128559174971663,declared_repost,B 站简介附 @LinearUncle 原帖链接；两者时长均为 457 秒
+x:2103128559174971663,x-2103128559174971663,original_claimed,原帖作者 @LinearUncle；athemeroy 记录作者称用 Manim 和 edge-tts 制作
+bilibili:BV1tLhb6CEdd,x-2102575577563570450,declared_repost,B 站简介附 @aj_dev_smith 原帖链接；时长 151 秒对 150.4 秒
+x:2102575577563570450,x-2102575577563570450,original_claimed,原帖作者 @aj_dev_smith
+bilibili:BV1p4h46tEo6,x-2102588571442188577,declared_repost,B 站简介附 @xikhar 原帖链接；时长 187 秒对 187.0 秒
+x:2102588571442188577,x-2102588571442188577,original_claimed,原帖作者 @xikhar
+bilibili:BV1Nohp6HEFe,x-2102440678282412195,declared_repost,B 站简介附 @The_Alex 原帖链接；时长 131 秒对 130.8 秒
+x:2102440678282412195,x-2102440678282412195,original_claimed,原帖作者 @The_Alex
+bilibili:BV1Zhag6CESz,x-2102436464323661880,declared_repost,B 站简介署名 @devteamdrew；时长 33 秒对 32.0 秒，@devteamdrew 在数据中只有这一条作品
+bilibili:BV1t7hb6GEsv,x-2102436464323661880,declared_repost,B 站简介署名 @devteamdrew；时长 32 秒对 32.0 秒
+x:2102436464323661880,x-2102436464323661880,original_claimed,原帖作者 @devteamdrew
+bilibili:BV1o7hx6yEJs,x-2102437977435893771,declared_repost,B 站简介署名 @kevin_t_ngo；时长 29 秒对 28.1 秒，该账号在数据中只有这一条作品
+x:2102437977435893771,x-2102437977435893771,original_claimed,原帖作者 @kevin_t_ngo
+bilibili:BV1uMag68E9x,x-2103151003272962130,declared_repost,B 站简介署名 @shneural，标题同为 Opus 5.5 与 GPT-6 Astra 同提示词对比；X 原帖时长未采集
+bilibili:BV1wsag6UEFR,x-2102986085328716066,declared_repost,B 站简介署名 @ring_hyacinth，标题为用代码制作的中秋节动画；X 原帖时长未采集
+bilibili:BV1xQhp6RET4,x-2102451997395866021,declared_repost,B 站简介附 @bridgemindai 原帖链接
+x:2102451997395866021,x-2102451997395866021,original_claimed,B 站转载引用的原帖；原帖正文未采集
+bilibili:BV1MPt16LExA,x-2096061462032826495,declared_repost,B 站简介注明转自 @masahirochaen 并附原帖链接
+x:2096061462032826495,x-2096061462032826495,original_claimed,B 站转载引用的原帖；原帖正文未采集
+bilibili:BV1PrhU6tEAa,x-2103315922098470926,declared_repost,B 站标题标注转载并附 @stephanlivera 原帖链接
+x:2103315922098470926,x-2103315922098470926,original_claimed,B 站转载引用的原帖；原帖正文未采集

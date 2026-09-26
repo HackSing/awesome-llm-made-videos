@@ -1,0 +1,14 @@
+{
+  "run": "20260926T132505Z",
+  "launch": "2026-09-opus-5-5-gpt-6",
+  "queries": 16,
+  "search_calls": 173,
+  "search_ok": 173,
+  "unique_hits": 1131,
+  "dropped_no_model_mention": 313,
+  "dropped_before_window": 3,
+  "candidates_this_run": 815,
+  "detail_lookups_ok": 814,
+  "candidates_total_after_merge": 815,
+  "stopped": null
+}

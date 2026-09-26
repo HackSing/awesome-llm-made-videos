@@ -1,0 +1,39 @@
+name: New work
+description: 提交一件大模型参与制作的视频，或给已有作品补充来源 / Suggest an LLM-made video or a better source.
+title: "Work: "
+labels: [work-review]
+body:
+  - type: input
+    id: original
+    attributes:
+      label: 原发链接 / Original post
+      description: 作者本人最早发布的那条。不确定就填你看到的那条，下面再说明。
+      placeholder: https://x.com/creator/status/1234567890
+    validations:
+      required: true
+  - type: textarea
+    id: appearances
+    attributes:
+      label: 其他平台的出现 / Other appearances
+      description: 同一作品在其他平台的链接，包括转载，每行一条。
+  - type: input
+    id: models
+    attributes:
+      label: 模型 / Model(s)
+      placeholder: Claude Opus 5.5
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据 / Evidence
+      description: 代码仓库、公开提示词、制作说明、作者回复。区分"作者说的"和"能验证的"。
+    validations:
+      required: true
+  - type: textarea
+    id: production
+    attributes:
+      label: 分工 / Production roles
+      description: 作者提供了什么素材？模型做了什么？画面和声音分别由什么程序或模型生成？
+    validations:
+      required: true

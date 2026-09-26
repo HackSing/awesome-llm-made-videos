@@ -1,0 +1,22 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Full API responses and any downloaded media stay local (audit only, never redistributed)
+data/raw/
+
+# Media, in case it lands anywhere else
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.flv
+*.m4a
+*.mp3
+*.wav
+*.zip
