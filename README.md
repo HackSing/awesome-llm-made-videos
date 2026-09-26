@@ -7,7 +7,7 @@
 *Videos made **with** LLMs, tracked across platforms: who made them, who reposted them, and how the pixels were produced.*
 
 <!-- snapshot:summary -->
-> **快照 2026-09-26**：候选帖子 2,048 条（B站 815，YouTube 1，X 1,232；其中 X 的 1,081 条来自 athemeroy 仓库，本项目未逐条筛选）。已筛选 974 条，确认为大模型参与制作的作品 521 件，在各平台共出现 537 次，其中标为转载的 55 次。筛选只看了文字，没有看画面，结论都有待人工复核。
+> **快照 2026-09-26**：候选帖子 2,048 条（B站 815，YouTube 1，X 1,232；其中 X 的 1,081 条来自 athemeroy 仓库，本项目未逐条筛选）。已筛选 974 条，确认为大模型参与制作的作品 521 件，在各平台共出现 537 次，其中上传者自己声明是转载的 33 次，筛选判为疑似转载、尚未找到原作的 22 次。筛选只看了文字，没有看画面，结论都有待人工复核。
 <!-- /snapshot:summary -->
 
 ## 章节
@@ -29,7 +29,7 @@
 | Astra图像分层2D动画 | wu_tian吴天 | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV195bu6REvm) | A* |
 | 月形水上前端动画复刻 | Ulchemist | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV14aYL6GEbx) | A* |
 | 小鲸鱼旅行短片 | MRDave先生 | DeepSeek V4.1 | [B站](https://www.bilibili.com/video/BV1mbh26ZE9p) | A* |
-| 中秋拼贴动画 | @ring_hyacinth | Opus 5.5 | [X](https://x.com/ring_hyacinth/status/2102986085328716066) · [B站（转载）](https://www.bilibili.com/video/BV1wsag6UEFR) · [X（转载）](https://x.com/NFT_Chen/status/2103380404791333144) | B |
+| 中秋拼贴动画 | @ring_hyacinth | Opus 5.5 | [X](https://x.com/ring_hyacinth/status/2102986085328716066) · [B站（转载）](https://www.bilibili.com/video/BV1wsag6UEFR) · [X（疑似转载）](https://x.com/NFT_Chen/status/2103380404791333144) | B |
 
 其余 90 件见 [`data/works.csv`](data/works.csv)。
 
@@ -77,7 +77,7 @@
 | 停车场演唱会MV | TigeriiZ周大老虎 | GPT-6 Astra、GPT-6 Pro | [B站](https://www.bilibili.com/video/BV1ShbV68EQL) | B |
 | 《最后一处脏》短片 | 大师兄酱啊 | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV1GthU6TEss) | B |
 | MiniMax H3舞蹈动作迁移 | Robert_V | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1b9hS6MEqs) | B |
-| Astra+Seedance玩法 | @servasyy_ai | GPT-6 Astra | [X（转载）](https://x.com/servasyy_ai/status/2096107848333947020) | C |
+| Astra+Seedance玩法 | @servasyy_ai | GPT-6 Astra | [X（疑似转载）](https://x.com/servasyy_ai/status/2096107848333947020) | C |
 
 其余 5 件见 [`data/works.csv`](data/works.csv)。
 

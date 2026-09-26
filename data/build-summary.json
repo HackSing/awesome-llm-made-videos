@@ -7,5 +7,10 @@
     "bilibili": 406,
     "youtube": 1
   },
-  "reposts": 55
+  "reposts": 55,
+  "by_repost_status": {
+    "declared_repost": 33,
+    "suspected_repost": 22,
+    "uncredited_repost": 0
+  }
 }

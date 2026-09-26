@@ -65,6 +65,8 @@ REPOST_STATUS = {
     "repost_suspected": "suspected_repost", "unknown": "unknown",
 }
 REPOSTS = {"declared_repost", "uncredited_repost", "suspected_repost"}
+# a suspected repost is a text-only guess by triage, so it is never shown as a plain "repost"
+REPOST_TAGS = {"declared_repost": "（转载）", "uncredited_repost": "（未署名转载）", "suspected_repost": "（疑似转载）"}
 
 
 def load_labels():
@@ -179,7 +181,7 @@ def main():
     def row(w):
         models = "、".join(MODEL_NAMES.get(m, m) for m in w["models"].split(";") if m)
         where = " · ".join(
-            f"[{PLATFORM_NAMES.get(a['platform'], a['platform'])}{'（转载）' if a['repost_status'] in REPOSTS else ''}]({a['url']})"
+            f"[{PLATFORM_NAMES.get(a['platform'], a['platform'])}{REPOST_TAGS.get(a['repost_status'], '')}]({a['url']})"
             for a in sorted(apps_by_work[w["work_id"]], key=lambda a: a["published_utc"])
         )
         title = w["title"] + ("（对比）" if w["kind"] == "comparison" else "")
@@ -206,6 +208,7 @@ def main():
         "triaged": len(labels),
         "by_platform": {p: sum(1 for a in appearances if a["platform"] == p) for p in PLATFORM_NAMES},
         "reposts": sum(1 for a in appearances if a["repost_status"] in REPOSTS),
+        "by_repost_status": {k: sum(1 for a in appearances if a["repost_status"] == k) for k in sorted(REPOSTS)},
     }
     (DATA / "build-summary.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2) + "\n", "utf-8")
 
@@ -221,7 +224,8 @@ def main():
         f"> **快照 {date}**：候选帖子 {sum(len(v) for v in cand.values()):,} 条（{per_platform}；"
         f"其中 X 的 {seed_only:,} 条来自 athemeroy 仓库，本项目未逐条筛选）。"
         f"已筛选 {len(labels):,} 条，确认为大模型参与制作的作品 {len(works)} 件，"
-        f"在各平台共出现 {len(appearances)} 次，其中标为转载的 {stats['reposts']} 次。"
+        f"在各平台共出现 {len(appearances)} 次，其中上传者自己声明是转载的 {stats['by_repost_status']['declared_repost']} 次，"
+        f"筛选判为疑似转载、尚未找到原作的 {stats['by_repost_status']['suspected_repost']} 次。"
         f"筛选只看了文字，没有看画面，结论都有待人工复核。"
     )
 
