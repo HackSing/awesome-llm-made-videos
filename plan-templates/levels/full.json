@@ -1,0 +1,22 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "level",
+  "id": "full",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "title", "label": "方案标题", "required": true},
+    {"id": "key_symbols", "label": "关键符号（2-4 个）", "required": true},
+    {"id": "background", "label": "背景", "required": true},
+    {"id": "objective", "label": "目标", "required": true},
+    {"id": "non_goals", "label": "非目标", "required": true},
+    {"id": "success_criteria", "label": "成功标准", "required": true},
+    {"id": "execution_scope", "label": "执行范围", "required": true},
+    {"id": "implementation", "label": "执行内容", "required": true},
+    {"id": "module_interfaces", "label": "模块划分与接口骨架", "required": true, "guidance": "列出新增/修改的模块：各自职责一句话、对外接口符号（函数/类/命令签名）、复用的现有代码路径。实施时骨架先行：先落文件与接口签名（空实现），再分批填充逻辑；全局结构在此冻结，实施不得绕开。"},
+    {"id": "acceptance_plan", "label": "验收方案", "required": true},
+    {"id": "acceptance_required", "label": "是否需要 Acceptance 资产闭环", "required": true, "guidance": "只填写 true 或 false；true 时必须先完成 acceptance create/record/settle，plan settle 才会放行。"},
+    {"id": "knowledge_impact", "label": "Knowledge 影响", "required": true, "guidance": "只填写 updated 或 unchanged；updated 需在结算输入列出活跃 Knowledge，unchanged 需说明理由。"},
+    {"id": "constraints", "label": "约束", "required": false},
+    {"id": "risks_and_rollback", "label": "风险与回滚", "required": false}
+  ]
+}

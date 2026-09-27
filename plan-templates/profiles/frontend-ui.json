@@ -1,0 +1,17 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "profile",
+  "id": "frontend_ui",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "user_scenario", "label": "用户与场景", "required": true},
+    {"id": "user_flow", "label": "入口与用户流程", "required": true},
+    {"id": "state_matrix", "label": "完整状态矩阵", "required": true},
+    {"id": "components_interactions", "label": "组件与交互", "required": true, "guidance": "交互方案以 Dribbble、Behance 等顶尖设计平台的一流作品为质量基线：层级清晰、反馈即时、动效有目的；不接受「能用就行」的默认样式堆砌。"},
+    {"id": "visual_responsive", "label": "视觉与响应式", "required": true, "guidance": "视觉质量对齐 Dribbble 等顶尖设计平台水准：明确的视觉层级、一致的间距与排版体系、克制的配色；输出前自查是否达到可公开参评的水平。"},
+    {"id": "accessibility", "label": "可访问性", "required": true},
+    {"id": "design_system_reuse", "label": "设计系统复用", "required": true, "guidance": "视觉与交互代码同样适用「先复用后新写、重复即抽象」：颜色、间距、字号、圆角、阴影必须收敛为设计 token 单一来源，禁止散落硬编码；相同或相近的组件、样式与交互模式第 3 次出现时必须抽为共享组件或样式模块（两次保持原样），不得复制粘贴后微调；优先复用项目已有设计系统与组件库，搜过什么、为何不能复用要在本字段说明。"},
+    {"id": "consumer_copy", "label": "界面文案与受众", "required": true, "guidance": "所有用户可见文案面向普通消费者而非开发者：禁止技术术语、错误码、变量名和内部概念；用用户的语言说明能做什么、下一步做什么。"},
+    {"id": "runtime_acceptance", "label": "真实页面或桌面运行态验收", "required": true, "guidance": "所有任务完成后由 agent 自己执行，不得交由用户：启动模拟器或本地联调环境（可用 mock 数据），按真实用户流程逐项走查功能是否正常、视觉与交互是否对用户友好；发现不友好之处直接重新优化并复验，通过后才允许收尾。"}
+  ]
+}

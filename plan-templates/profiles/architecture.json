@@ -1,0 +1,17 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "profile",
+  "id": "architecture",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "current_constraints", "label": "当前约束", "required": true},
+    {"id": "alternatives", "label": "候选方案", "required": true},
+    {"id": "tradeoffs", "label": "真实取舍", "required": true},
+    {"id": "decision", "label": "最终决策", "required": true},
+    {"id": "boundaries_interfaces", "label": "边界与接口", "required": true},
+    {"id": "compatibility_migration", "label": "兼容与迁移", "required": true},
+    {"id": "rollback_strategy", "label": "回滚或替代路径", "required": true},
+    {"id": "architecture_acceptance", "label": "架构验收", "required": true},
+    {"id": "adr_decision", "label": "ADR 处理", "required": true}
+  ]
+}

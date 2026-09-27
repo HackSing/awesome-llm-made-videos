@@ -1,0 +1,38 @@
+#!/bin/sh
+# Docs Harness pre-commit：四类资产的快速机械完整性检查。
+# 结构不具备（无 scripts/harness.py 或 docs）时静默放行；
+# python 不可用时不锁死提交，但打印醒目警告。
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -f "$ROOT/scripts/harness.py" ] || exit 0
+[ -d "$ROOT/docs" ] || exit 0
+cd "$ROOT" || exit 0
+
+if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+else
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+    echo "!! WARNING: 未找到 python/python3，已跳过 assets-check 检查 !!" >&2
+    echo "!! 四类文档资产未验证，请尽快补跑：                         !!" >&2
+    echo "!!   python scripts/harness.py assets-check --fast          !!" >&2
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+    exit 0
+fi
+
+OUTPUT=$("$PYTHON_BIN" scripts/harness.py assets-check --target . --fast 2>&1)
+CODE=$?
+if [ "$CODE" -ne 0 ]; then
+    echo "$OUTPUT" >&2
+    echo "pre-commit: assets-check 未通过（exit=$CODE），提交已中止" >&2
+    exit 1
+fi
+
+# 项目级扩展点：scripts/githooks/pre-commit.local 存在时在同一 shell source，
+# 可用 $PYTHON_BIN，非零退出即中止提交。项目自定义检查写该文件（随项目提交，
+# 不计入受管指纹），不要分叉修改本受管文件。
+if [ -f "scripts/githooks/pre-commit.local" ]; then
+    . "scripts/githooks/pre-commit.local"
+fi
+exit 0

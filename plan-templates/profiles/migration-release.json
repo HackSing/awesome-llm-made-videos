@@ -1,0 +1,15 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "profile",
+  "id": "migration_release",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "source_target", "label": "源与目标", "required": true},
+    {"id": "versions_artifacts", "label": "版本与产物", "required": true},
+    {"id": "compatibility_rollout", "label": "兼容与灰度", "required": true},
+    {"id": "data_safety", "label": "数据安全", "required": true},
+    {"id": "monitoring_stop", "label": "监控与停止条件", "required": true},
+    {"id": "rollback", "label": "回滚", "required": true},
+    {"id": "delivery_layers", "label": "交付层分离", "required": true}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "profile",
+  "id": "bugfix",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "exact_reproduction", "label": "精确复现", "required": true},
+    {"id": "event_timeline", "label": "完整事件时间线", "required": true},
+    {"id": "first_divergence", "label": "首次偏离", "required": true},
+    {"id": "root_cause_evidence", "label": "根因证据", "required": true},
+    {"id": "fix_boundary", "label": "修复边界", "required": true},
+    {"id": "regression_paths", "label": "正向、负向与回归路径", "required": true},
+    {
+      "id": "affected_modules",
+      "label": "受影响模块",
+      "required": true,
+      "guidance": "列出由根因、调用链和改动面证明会受影响的模块；不得用整个仓库代替影响分析。"
+    },
+    {
+      "id": "verification_scope",
+      "label": "验证范围",
+      "required": true,
+      "guidance": "声明 mode=affected_modules|repository_full、实际命令和可复用的已通过证据；默认 affected_modules。"
+    },
+    {
+      "id": "full_regression_trigger",
+      "label": "仓库级全量测试触发依据",
+      "required": true,
+      "guidance": "仅接受 cross_module_change、public_contract_change、shared_infrastructure_change、dependency_or_shared_fixture_change、release_gate；未触发时 required=false。"
+    },
+    {
+      "id": "failure_attribution",
+      "label": "失败归因规则",
+      "required": true,
+      "guidance": "声明 change_related、unrelated、pre_existing、environment、flaky 五类，非本次变更失败必须分项记录并引用证据。"
+    }
+  ]
+}

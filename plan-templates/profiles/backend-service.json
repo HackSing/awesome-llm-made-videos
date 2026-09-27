@@ -1,0 +1,18 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "profile",
+  "id": "backend_service",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "api_contract", "label": "接口合同", "required": true},
+    {"id": "data_model", "label": "数据模型", "required": true},
+    {"id": "consistency", "label": "一致性语义", "required": true},
+    {"id": "concurrency_idempotency", "label": "并发与幂等", "required": true},
+    {"id": "failure_retry", "label": "失败与重试", "required": true},
+    {"id": "security_privacy", "label": "安全与隐私", "required": true},
+    {"id": "performance_capacity", "label": "性能与容量", "required": true},
+    {"id": "observability", "label": "可观测性", "required": true},
+    {"id": "compatibility_migration", "label": "兼容与迁移", "required": true},
+    {"id": "service_acceptance", "label": "真实服务验收", "required": true}
+  ]
+}

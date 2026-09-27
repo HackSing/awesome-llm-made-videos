@@ -1,0 +1,14 @@
+{
+  "schema_version": "docs-harness/plan-template/v3",
+  "kind": "level",
+  "id": "brief",
+  "version": "2.24.0",
+  "fields": [
+    {"id": "title", "label": "方案标题", "required": true},
+    {"id": "key_symbols", "label": "关键符号（2-4 个）", "required": true},
+    {"id": "objective", "label": "目标", "required": true},
+    {"id": "scope", "label": "范围", "required": true},
+    {"id": "steps", "label": "关键步骤", "required": true},
+    {"id": "acceptance", "label": "验收方案", "required": true}
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "docs-harness/project-config/v13",
+  "version": "2.24.0",
+  "installed_script_fingerprint": "sha256:6e129ef53fb8fe69f9ad8fa6a849f433bf5bf6a30b710cd31256ce1f4aba93ea",
+  "installed_module_fingerprints": {
+    "managed_assets.py": "sha256:298c73562c7a93442c592aa342a19572f88c7c0150d496ef8c944c6bb268157e",
+    "asset_checks.py": "sha256:b3ebfe35fafd720061c9f295d8d680574866db967c51676f0c6be1edc3e7ae92",
+    "plan_governance.py": "sha256:7113fd08b8b35393b13cdaa52ef98ad89619af0db10fd4682e360a8e7138b3f5",
+    "knowledge_assets.py": "sha256:45723f04f929c5f8827bc0c655ac7230512f574e2bfa8f45a3dcb5c91101d59f",
+    "acceptance_assets.py": "sha256:923fafa850062be111f1427d6cc1a0dad4201292473b5438d565996851958203",
+    "adr_assets.py": "sha256:8a4c7ccdfe6be892315502d1dc6b5df0c66e52180b44f8755cca07f0bbd0de73",
+    "script_hygiene.py": "sha256:1db484e0ac9e2f033fa779b07c112cf614ab63877f03c7f046a99adc10bde9c8",
+    "structure_check.py": "sha256:4ae64e67c3c64c47b6216b2543c72215786baafb26253d90b7f764207ce8a832",
+    "structure_ts_functions.cjs": "sha256:50b5f1b38bbc6d28027ff45658a27e7e923eee1dccf357e019b4eba919532f1f",
+    "usage_log.py": "sha256:3e1f69c8fee0ff778285b543135c7e74e4862907172dd901ae6ddf13d707309a",
+    "usage_report.py": "sha256:f319f931f9082874a0d7842716bd70f4a76ae0535bc603e05e3a43a72a71e9de"
+  },
+  "installed_plan_template_fingerprints": {
+    "levels/brief.json": "sha256:c9b9ca5404be11094ccab19749f83406bb0293d3c693dcedc7c052362b9ee520",
+    "levels/full.json": "sha256:3b098e8809c4155ffe2778e21236314c047f131f83981b8e42a35756397774c3",
+    "profiles/general.json": "sha256:84db28fe05b5f84e0ac48f5a14972c3271df6d1c2ab76fa87b9d7312fe321740",
+    "profiles/frontend-ui.json": "sha256:c1895df61351d24f7902f6bfca6fda53c92e9bd93c64d5d6d51581e8f6b21bcb",
+    "profiles/backend-service.json": "sha256:fdee82e2618bf9389458bef12603344df0ff3bcc684af31c7817edd72202a7a7",
+    "profiles/bugfix.json": "sha256:590b3551f5b9fbfbafa37e2d29a69c4ded33ddea7a0c1ffed17fcec3d62ff922",
+    "profiles/architecture.json": "sha256:2715f4e1c23c87c04b9a6c5636f9d821d0a451edc0a8a9d142c2a17f2f52c9df",
+    "profiles/migration-release.json": "sha256:f5c93f000d74759cdbe15b35b774785ae1a94f3562b6e57716d47abf176b28f4"
+  },
+  "installed_githook_fingerprints": {
+    "pre-commit": "sha256:e9b730e659176c0dabbccca9773910d3261fee972afbb51f2e379642b238048c",
+    "setup.sh": "sha256:182e05edcfc08db2b51250db4bed87a64cf53d78bbaebfe7d8ce43d07d592a37"
+  },
+  "direct_mode": {
+    "default": true
+  },
+  "knowledge": {
+    "mode": "asset_lifecycle",
+    "query": "on_demand",
+    "docs_preexisting_at_install": true
+  },
+  "usage_log": {
+    "enabled": true
+  },
+  "migration": {
+    "source_version": null,
+    "legacy_document_system": "not_present",
+    "removed_paths": [],
+    "preserved_paths": []
+  },
+  "installed_at": "2026-09-27T10:02:47+00:00"
+}
