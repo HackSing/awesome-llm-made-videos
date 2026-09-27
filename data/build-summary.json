@@ -1,18 +1,18 @@
 {
-  "works": 669,
-  "appearances": 685,
-  "triaged": 1120,
+  "works": 683,
+  "appearances": 699,
+  "triaged": 1134,
   "by_platform": {
-    "x": 278,
+    "x": 292,
     "bilibili": 406,
     "youtube": 1
   },
   "reposts": 55,
   "evidence": {
     "A": 5,
-    "A*": 12,
-    "B": 130,
-    "C": 493,
+    "A*": 13,
+    "B": 136,
+    "C": 500,
     "D": 29
   },
   "by_repost_status": {
