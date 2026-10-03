@@ -2,7 +2,7 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "profile",
   "id": "frontend_ui",
-  "version": "2.25.0",
+  "version": "2.26.0",
   "fields": [
     {"id": "user_scenario", "label": "用户与场景", "required": true},
     {"id": "user_flow", "label": "入口与用户流程", "required": true},

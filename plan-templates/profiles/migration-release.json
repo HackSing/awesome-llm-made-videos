@@ -2,7 +2,7 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "profile",
   "id": "migration_release",
-  "version": "2.25.0",
+  "version": "2.26.0",
   "fields": [
     {"id": "source_target", "label": "源与目标", "required": true},
     {"id": "versions_artifacts", "label": "版本与产物", "required": true},
