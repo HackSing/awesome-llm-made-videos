@@ -70,7 +70,7 @@ from usage_log import (
     is_enabled as usage_log_enabled,
 )
 from usage_report import USAGE_REPORT_DEFAULT_DAYS, build_report as build_usage_report
-VERSION = "2.24.0"
+VERSION = "2.25.0"
 CONFIG_SCHEMA = "docs-harness/project-config/v13"
 KNOWN_LEGACY_CONFIG_SCHEMAS = {
     f"docs-harness/project-config/v{version}" for version in range(1, 13)
@@ -139,6 +139,10 @@ MANAGED_BEGIN = "<!-- docs-harness:managed-entry:start -->"
 MANAGED_END = "<!-- docs-harness:managed-entry:end -->"
 CLAUDE_BEGIN = "<!-- docs-harness:claude-bridge:start -->"
 CLAUDE_END = "<!-- docs-harness:claude-bridge:end -->"
+# CLAUDE.md 受管区块只放这一行导入：两个文件都在时 Claude Code 只读 CLAUDE.md，经导入读到整份
+# AGENTS.md（含块外的项目规则），规约只有一份真源。旧版在这里复制受管正文，块外的项目规则 Claude 看不到，
+# 自己再导入 AGENTS.md 的项目则加载两遍。
+CLAUDE_IMPORT = "@AGENTS.md"
 MANAGED_VERSION_BEGIN = "<!-- docs-harness:managed-version:start -->"
 MANAGED_VERSION_END = "<!-- docs-harness:managed-version:end -->"
 PLAN_INDEX_BEGIN = "<!-- docs-harness:plans-index:start -->"
@@ -490,7 +494,7 @@ _GENERIC_STANDARDS = """
 
 
 def _managed_content() -> str:
-    """Harness 运行模式 + 通用规范。AGENTS.md 与 CLAUDE.md 受管区块共享。"""
+    """Harness 运行模式 + 通用规范：AGENTS.md 受管区块的正文；CLAUDE.md 经 CLAUDE_IMPORT 读到它。"""
     return f"""## Docs Harness {VERSION}：默认直跑，能力按需
 
 - 普通问答、只读检查、代码修改、构建和测试默认不经 Harness 流程直接执行；Harness 不作为任务入口，也不创建任务控制状态。"直接"指不走 Harness，不指主 agent 亲自串行完成，任务如何拆分与委派见工作流规则第 5 条。
@@ -512,7 +516,7 @@ def managed_agent_block(target: Path) -> str:
 
 
 def claude_block(target: Path) -> str:
-    return f"{CLAUDE_BEGIN}\n{_managed_content()}\n{CLAUDE_END}"
+    return f"{CLAUDE_BEGIN}\n{CLAUDE_IMPORT}\n{CLAUDE_END}"
 
 
 def validate_managed_markers(text: str, begin: str, end: str) -> None:

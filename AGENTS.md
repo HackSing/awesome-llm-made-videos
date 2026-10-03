@@ -1,7 +1,7 @@
 # AGENTS.md
 
 <!-- docs-harness:managed-entry:start -->
-## Docs Harness 2.24.0：默认直跑，能力按需
+## Docs Harness 2.25.0：默认直跑，能力按需
 
 - 普通问答、只读检查、代码修改、构建和测试默认不经 Harness 流程直接执行；Harness 不作为任务入口，也不创建任务控制状态。"直接"指不走 Harness，不指主 agent 亲自串行完成，任务如何拆分与委派见工作流规则第 5 条。
 - 用户明确说“不使用 Harness”时必须直接执行，不得暗中恢复旧流程。
