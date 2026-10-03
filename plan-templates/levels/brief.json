@@ -2,7 +2,7 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "level",
   "id": "brief",
-  "version": "2.26.0",
+  "version": "2.26.1",
   "fields": [
     {"id": "title", "label": "方案标题", "required": true},
     {"id": "key_symbols", "label": "关键符号（2-4 个）", "required": true},

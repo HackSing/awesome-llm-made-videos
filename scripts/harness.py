@@ -70,7 +70,7 @@ from usage_log import (
     is_enabled as usage_log_enabled,
 )
 from usage_report import USAGE_REPORT_DEFAULT_DAYS, build_report as build_usage_report
-VERSION = "2.26.0"
+VERSION = "2.26.1"
 CONFIG_SCHEMA = "docs-harness/project-config/v13"
 KNOWN_LEGACY_CONFIG_SCHEMAS = {
     f"docs-harness/project-config/v{version}" for version in range(1, 13)
@@ -519,7 +519,7 @@ _GENERIC_STANDARDS = """
 3. **你没要求的改动**：超出或偏离用户要求的地方，每条一句，并说明可以撤回。没有就省略。
 4. **局限**：失败、跳过、未完成和未覆盖的风险，多条时按严重性排序。它们影响用户决定，留在回复里，不挪进记录。没有就省略。
 
-回复最后一行给收尾记录的路径；用户追问细节时再从记录里取。没有改动的回复（问答、只读检查）不套四块、不写记录。提交代码时，提交说明正文加两行：「验证：」写做了哪些验证及结果，「未覆盖：」写没验证到的部分，没有就写"无"。"""
+回复最后一行给收尾记录的路径；用户追问细节时再从记录里取。没有改动的回复（问答、只读检查）不套四块、不写记录，但同样只写影响判断或决定的内容：证据只给等级与定位（文件:行、命令与退出码、实测值），不贴过程与完整输出，用户追问再展开。提交代码时，提交说明正文加两行：「验证：」写做了哪些验证及结果，「未覆盖：」写没验证到的部分，没有就写"无"。"""
 
 
 def _managed_content() -> str:
