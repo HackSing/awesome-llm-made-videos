@@ -2,7 +2,7 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "profile",
   "id": "backend_service",
-  "version": "2.26.2",
+  "version": "2.28.0",
   "fields": [
     {"id": "api_contract", "label": "接口合同", "required": true},
     {"id": "data_model", "label": "数据模型", "required": true},

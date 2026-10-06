@@ -39,6 +39,7 @@ from knowledge_assets import (
     KNOWLEDGE_SPEC,
     check as check_knowledge_assets,
     create as create_knowledge_asset,
+    follow_archived_refs,
     query as query_knowledge_assets,
     settle as settle_knowledge_asset,
     update as update_knowledge_asset,
@@ -47,6 +48,8 @@ from acceptance_assets import (
     ACCEPTANCE_EVIDENCE_LAYERS,
     ACCEPTANCE_LAYERS,
     ACCEPTANCE_SETTLE_INPUT_SCHEMA,
+    ACCEPTANCE_SETTLE_STATUS_NOTES,
+    ACCEPTANCE_SETTLE_STATUSES,
     ACCEPTANCE_SPEC,
     ACCEPTANCE_TARGET_INPUT_SCHEMA,
     check as check_acceptance_assets,
@@ -70,7 +73,8 @@ from usage_log import (
     is_enabled as usage_log_enabled,
 )
 from usage_report import USAGE_REPORT_DEFAULT_DAYS, build_report as build_usage_report
-VERSION = "2.26.2"
+from diagram_view import VIEWS_RELATIVE, open_in_browser, write_view
+VERSION = "2.28.0"
 CONFIG_SCHEMA = "docs-harness/project-config/v13"
 KNOWN_LEGACY_CONFIG_SCHEMAS = {
     f"docs-harness/project-config/v{version}" for version in range(1, 13)
@@ -96,7 +100,7 @@ TASK_INPUTS_RELATIVE = ".docs-harness/inputs"
 TASKS_RELATIVE = ".docs-harness/tasks"
 REPORTS_RELATIVE = ".docs-harness/reports"
 # 不入库、升级不清理的本地约定目录；共用下方嵌套忽略与 local_only_dir_changes 一份判定。
-LOCAL_ONLY_DIRS = (TASK_INPUTS_RELATIVE, TASKS_RELATIVE, REPORTS_RELATIVE)
+LOCAL_ONLY_DIRS = (TASK_INPUTS_RELATIVE, TASKS_RELATIVE, REPORTS_RELATIVE, VIEWS_RELATIVE)
 # 与 usage_log._GITIGNORE_CONTENT 同口径的嵌套忽略（该写法的第 2 次出现，第 3 次再抽）。
 LOCAL_ONLY_GITIGNORE_CONTENT = "*\n"
 GIT_HOOKS_RELATIVE = "scripts/githooks"
@@ -113,6 +117,7 @@ MANAGED_MODULE_RELATIVE_FILES = (
     "structure_ts_functions.cjs",
     "usage_log.py",
     "usage_report.py",
+    "diagram_view.py",
 )
 PLAN_DOCS_RELATIVE = "docs/plans"
 PLAN_ARCHIVE_RELATIVE = "docs/plans/archive"
@@ -407,9 +412,11 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
 _GENERIC_STANDARDS = """
 ## 协作准则
 
-- **按意图交付**：动手前用一句话说出用户拿这个要去做什么，按那个目标交付，而不是按字面。只影响交付完整度的歧义按更完整的理解做，并写明假设；会改变目标、方案或验收的歧义按工作流规则第 1 条先确认。常见映射：要"给 X 的文档"→能直接转交的自包含形态（文档+数据+代码+验证方式）；要"方案"→结论+依据+代价+明确推荐，不是选项清单；要"改一下"→改动+测试+受影响文档同步；要"跑一下"→结果+是否符合预期+异常处解释；问"对不对"→结论+核对方式+不一致处具体差在哪；要"看看"→判断+理由+建议的下一步。
+- **按意图交付**：动手前用一句话说出用户拿这个要去做什么，按那个目标交付，而不是按字面。只影响交付完整度的歧义按更完整的理解做，并写明假设；会改变目标、方案或验收的歧义按工作流规则第 1 条先确认。常见映射：要"给 X 的文档"→能直接转交的自包含形态（文档+数据+代码+验证方式）；要"方案"→结论+依据+代价+明确推荐，不是选项清单；\
+要"改一下"→改动+测试+受影响文档同步；要"跑一下"→结果+是否符合预期+异常处解释；问"对不对"→结论+核对方式+不一致处具体差在哪；要"看看"→判断+理由+建议的下一步。
 - **前提有误先纠正**：用户的问题里带着错误前提时，第一句先说清哪部分对、哪部分不对，再按正确的前提交付，不顺着错误前提干活。被指出做错时，先确认错在哪、影响到哪些产出，把受影响的产出改回来再继续，不一边认错一边保留错误结果。
-- **结论标明证据等级**：每个判断要么附证据（命令与退出码、文件:行、实测值），要么标明「推测」并写出验证方式；推测不放在结论位置，也不用确定语气。否定结论（没有、不存在、全都）门槛最高：写明查了哪些范围，空结果先排除命令报错、写法错误和范围遗漏，能加正对照就加（先查一个已知存在的对象，确认查询本身有效）。数值与行为预测先跑最小实验，来不及就标「估计」并给出依据；从样本推到全体时写明样本数。
+- **结论标明证据等级**：每个判断要么附证据（命令与退出码、文件:行、实测值），要么标明「推测」并写出验证方式；推测不放在结论位置，也不用确定语气。否定结论（没有、不存在、全都）门槛最高：写明查了哪些范围，空结果先排除命令报错、写法错误和范围遗漏，能加正对照就加（先查一个已知存在的对象，确认查询本身有效）。数值与行为预测先跑最小实验，\
+来不及就标「估计」并给出依据；从样本推到全体时写明样本数。
 - **完整不等于扩大范围**：同一交付物缺的部分、验证、依赖说明、文档同步自己补上；重构没让改的模块、改没提过的配置、优化没人抱怨的性能、删文件、提交代码等范围扩张先问用户。修改面约束见"不顺手加固"。
 - **可开工自检**：交付前自问：接收方拿到后，能不能不回来追问就开工？不能就把缺的部分一起补上，不等追问。
 
@@ -418,10 +425,14 @@ _GENERIC_STANDARDS = """
 每条规则自带触发条件；不满足触发条件的部分不启用，无需另行豁免。需要停下来等用户的只有三种情况：本文写明的确认点、用户另有要求、原生授权提示。其余步骤不需要用户输入时直接继续，进度说明与下一步动作放在同一条消息里，不以阶段汇报、"是否继续"的征询或不阻塞工作的选项清单收尾。
 
 1. **验收先行**：动手前先把验收条件转写为可执行的验证方式（测试、命令或复现步骤），完成与否以此为准。验收标准明确时直接执行，验证结果随收尾报告交付；仅当验收标准缺失或有歧义、且不同理解会改变方案时，先向用户确认。
-2. **根因优先**：修复 bug 前先定位根因并列出影响面（含同根因可能导致的其他表现）。根因清楚且修复局部、可逆时直接修，根因分析随收尾报告交付；根因跨模块、修复不可逆或存在代价不同的多个方案时，先经用户确认再改代码。定位读够、修改最少：找根因与影响面时上溯到状态所有者、下查到全部消费者，调用方用符号检索确认、不凭 CODEMAP 推断；"最小改动"只约束修改面，不得借此缩小阅读面。方案交给用户前（bug 修复、需用户确认的方案、Plan）逐项自检：① 修复是否落在状态所有者层，而非在消费者处打补丁；② 影响面清单每一条是否都被消除；③ 每处改动删掉后修复是否仍成立，仍成立即多余，删掉；④ 是否新增兜底、重试或兼容分支且拿不出状态可达的证据。任一项不过先改方案再输出；输出附一行自检结论，方案被修正过时写明改了什么。
+2. **根因优先**：修复 bug 前先定位根因并列出影响面（含同根因可能导致的其他表现）。根因清楚且修复局部、可逆时直接修，根因分析随收尾报告交付；根因跨模块、修复不可逆或存在代价不同的多个方案时，先经用户确认再改代码。定位读够、修改最少：找根因与影响面时上溯到状态所有者、下查到全部消费者，调用方用符号检索确认、不凭 CODEMAP 推断；\
+"最小改动"只约束修改面，不得借此缩小阅读面。方案交给用户前（bug 修复、需用户确认的方案、Plan）逐项自检：① 修复是否落在状态所有者层，而非在消费者处打补丁；② 影响面清单每一条是否都被消除；③ 每处改动删掉后修复是否仍成立，仍成立即多余，删掉；④ 是否新增兜底、重试或兼容分支且拿不出状态可达的证据。任一项不过先改方案再输出；输出附一行自检结论，\
+方案被修正过时写明改了什么。
 3. **回归必跑**：交付代码改动前，跑受影响模块的回归验证并附输出（模块级，非仓库级全量；全量测试的触发条件见"测试与验收范围"）。涉及工具 handler/状态机/workflow 的改动不因任务小而豁免：须逐段给出消费链确认证据——改了生产者不查消费者，是隐性回归的首要来源；消费者跨两个以上模块时按第 5 条分头并行确认。
-4. **分批交付**：改动跨模块数据流或预计 >3 个文件时分批执行。批次划分写入进度清单并随首批一并报告，每批标注依赖（`B2 ← B1` 或 `独立`）与文件范围；有依赖的批次串行走"改完 → 验证 → 锁定 → 下一批"（锁定指验证通过后该批不再回改，是验证门，不是停下汇报的点），互相独立且文件范围不相交的批次按第 5 条并行，各自验证后由主 agent 统一集成验证再锁定。仅当某批含不可逆或高风险动作时，先经用户确认。
-5. **并行优先**：任务拆出多个互不依赖的分支时，按分量选执行方式，不默认串行。单点任务直接做；轻量独立子任务（同时读几个文件、几个独立检索、几条独立命令）用同一条消息内的并行工具调用，不开子智能体；分支各自够重（需多步调研、评审，或文件范围不相交的实施）才同消息并行开子智能体，分支不重则 spawn 开销净亏。子智能体任务书必须带明确目标、验收条件、路径范围与文件白名单，汇报只回结论与证据路径，不回传文件内容；主 agent 核对证据支持结论后才采纳，不直接转述子智能体的结论。以下保持串行：修改同一文件、更新 CODEMAP/CHANGELOG/TODO/Knowledge 等受管公共文件（由主 agent 收尾统一写）、存在依赖的步骤、每批的验证门。并行不豁免第 3 条：分支回流后主 agent 仍跑一次集成验证。
+4. **分批交付**：改动跨模块数据流或预计 >3 个文件时分批执行。批次划分写入进度清单并随首批一并报告，每批标注依赖（`B2 ← B1` 或 `独立`）与文件范围；有依赖的批次串行走"改完 → 验证 → 锁定 → 下一批"（锁定指验证通过后该批不再回改，是验证门，不是停下汇报的点），互相独立且文件范围不相交的批次按第 5 条并行，各自验证后由主 agent 统一集成验证再锁定。\
+仅当某批含不可逆或高风险动作时，先经用户确认。
+5. **并行优先**：任务拆出多个互不依赖的分支时，按分量选执行方式，不默认串行。单点任务直接做；轻量独立子任务（同时读几个文件、几个独立检索、几条独立命令）用同一条消息内的并行工具调用，不开子智能体；分支各自够重（需多步调研、评审，或文件范围不相交的实施）才同消息并行开子智能体，分支不重则 spawn 开销净亏。\
+子智能体任务书必须带明确目标、验收条件、路径范围与文件白名单，汇报只回结论与证据路径，不回传文件内容；主 agent 核对证据支持结论后才采纳，不直接转述子智能体的结论。以下保持串行：修改同一文件、更新 CODEMAP/CHANGELOG/TODO/Knowledge 等受管公共文件（由主 agent 收尾统一写）、存在依赖的步骤、每批的验证门。并行不豁免第 3 条：分支回流后主 agent 仍跑一次集成验证。
 
 ## 编码质量规范
 
@@ -446,7 +457,8 @@ _GENERIC_STANDARDS = """
 2. **骨架先行（复杂任务）。** Full Plan 的 `module_interfaces` 字段冻结模块划分与接口骨架；实施先落文件与接口签名（空实现），再分批填充逻辑，不得绕开骨架直接堆代码。
 3. **增量检查随批次跑。** `assets-check` 内置 Structure 增量检查（WARN 级）；分批交付的每批验证点可用 `structure check` 单独快跑，WARN 按收尾规则转达，确实拆不动的说明理由即可。
 4. **存量债走定期整理。** 既有超红线文件/函数不在功能任务里顺手重构（见"不顺手加固"）；需要偿还时运行 `structure report` 拿存量清单，以报告开专门整理任务。
-5. **搜索面收敛。** 禁止无界递归检索——不得从仓库根对 `.` 做递归搜索，也不得让工具自己决定范围；路径必须落到本次任务相关的具体目录或文件，够用即止，并排除 `node_modules`、`.git`、构建产物（`dist`/`build`/`out`/`coverage`/`target`/`__pycache__`）、依赖缓存与生成物目录，大目录写宽了扫不出结果还拖慢任务。委派给子智能体的检索同样受此约束：任务书里的路径范围就是它的搜索边界，不得让子智能体自行决定范围。
+5. **搜索面收敛。** 禁止无界递归检索——不得从仓库根对 `.` 做递归搜索，也不得让工具自己决定范围；路径必须落到本次任务相关的具体目录或文件，够用即止，并排除 `node_modules`、`.git`、构建产物（`dist`/`build`/`out`/`coverage`/`target`/`__pycache__`）、依赖缓存与生成物目录，大目录写宽了扫不出结果还拖慢任务。委派给子智能体的检索同样受此约束：\
+任务书里的路径范围就是它的搜索边界，不得让子智能体自行决定范围。
 
 ## 防御代码准入
 
@@ -482,9 +494,11 @@ _GENERIC_STANDARDS = """
 
 ## 方案、知识与验收资产
 
-- plans 文档卫生（状态横幅、索引符号、归档死链、符号存活与时效）由 `plan check` 把关，pre-commit 与 CI 的 assets-check 已包含；起草期间不跑，提交前或 plan settle 时跑一次，报错即改。判定纪律：代码里找不到符号只能证明概念已死，不能证明方案过期（合法待实施方案同样没有代码）；证据不足标"存疑"，交用户裁决；符号全命中但仍在推进的部分交付方案按 WARN 提示登记核对日，不得为消除 WARN 而 settle。
+- plans 文档卫生（状态横幅、索引符号、归档死链、符号存活与时效）由 `plan check` 把关，pre-commit 与 CI 的 assets-check 已包含；起草期间不跑，提交前或 plan settle 时跑一次，报错即改。判定纪律：代码里找不到符号只能证明概念已死，不能证明方案过期（合法待实施方案同样没有代码）；证据不足标"存疑"，交用户裁决；符号全命中但仍在推进的部分交付方案按 WARN 提示登记核对日，\
+不得为消除 WARN 而 settle。
 - WARN 消费：收尾时 assets-check 输出与本任务领域相关的 WARN，必须在收尾报告中转达，不得静默略过。
-- Plan：复杂任务先 `plan select` 再 `plan create --output docs/plans/<name>.json` 冻结执行合同（自动生成同名 Markdown 并维护 docs/INDEX.md）；实施完成运行 `plan settle --status implemented`，被取代或废弃用 `--status deprecated`；无伴随 JSON 的手写方案同样直接 settle，不得手工补造冻结 JSON。不手工复制平行方案。Full Plan 声明验收与知识影响，settle 时校验；收尾按 Knowledge → Acceptance → Plan 顺序结算，声明需要验收的先完成 Acceptance 结项。
+- Plan：复杂任务先 `plan select` 再 `plan create --output docs/plans/<name>.json` 冻结执行合同（自动生成同名 Markdown 并维护 docs/INDEX.md）；实施完成运行 `plan settle --status implemented`，被取代或废弃用 `--status deprecated`；无伴随 JSON 的手写方案同样直接 settle，不得手工补造冻结 JSON。不手工复制平行方案。Full Plan 声明验收与知识影响，settle 时校验；收尾按 Knowledge → Acceptance → Plan 顺序结算，\
+声明需要验收的先完成 Acceptance 结项。
 - Knowledge：只记录有当前源码或项目文档证据支持的可复用事实：按需 `knowledge query`，沉淀 `create`，事实变化 `update`，被替代或废弃 `settle`，收尾 `check`。不得凭模型猜测自动写知识。
 - Acceptance：复杂任务在 Plan 后 `acceptance create` 建立目标，真实验证后逐条 `acceptance record`，证据文件必须位于随仓库提交的路径（如 docs/acceptance/evidence/<验收名>/）；失败修复后重新验收，最终 `acceptance settle` 并 `acceptance check`。简单任务直接验证，不强制创建资产。只有收到用户明确确认原话后才能记录 User Acceptance 通过；合同、测试、运行、安装和用户可见层不得相互替代。
 - 收尾统一运行 `assets-check`。提交时 pre-commit 钩子执行 `assets-check --fast`，GitHub CI 执行 `assets-check --strict`（新克隆机器先运行 `scripts/githooks/setup.sh` 激活钩子）。项目自定义提交检查写入 `scripts/githooks/pre-commit.local`，不得分叉修改受管 pre-commit。
@@ -498,16 +512,27 @@ _GENERIC_STANDARDS = """
 | 一句话能答完 | 纯文字 1–3 行，不上工具 |
 | 任务收尾、进度播报 | 收尾按"收尾"一节的四块；进度只写一行：现在做什么，下一步做什么 |
 | 要用户拍板 | 编号选项，每项附推荐；宿主支持点选时用点选 |
-| 结构、流程、因果 | 图 |
+| 线性步骤 | 编号列表，不画图 |
 | 对比几项 | 表格 |
 | 逐条审一批、需要筛选 | 交互网页，用户的选择存下来由 agent 读取 |
 | 命令、代码改动、界面改动 | 代码块、diff 视图、改前改后截图 |
 | 教会别人 | 先出脚本给用户确认，报出预计花费，再生成视频 |
 
-- 宿主渲染不了图或网页时，一律退回文字。
-- 画图优先写声明式源码（如 Mermaid），坐标交给布局引擎算，不手算。必须手写 SVG 时，渲染后截图核对箭头落点和文字是否出框。
+出图不受上表顺序限制。回复发出前查一遍，满足下面任一条就出图，图紧跟在结论后面，文字只补图里放不下的：
+
+- 用户表示没看懂、想看整体或要通俗解释（如「没明白」「通俗点讲」「理一下」「全貌」「路线图」「流程图」），或问 X 怎么工作、怎么配合、和 Y 是什么关系。
+- 用户要靠理解一段结构来做决定或排查，而这段结构有三方以上来回交互、分支或状态变化、或分阶段且各有进入条件。
+
+线性步骤、少量对比、填写说明不出图。
+
+出图步骤：
+
+1. 有 show_widget 工具时（如 Claude 桌面端）：先调它的 read_me，再按说明画，直接显示在对话里。
+2. 没有 show_widget 时：把图写成 Mermaid 源码文件，运行 `python3 scripts/harness.py view <源码文件> --open`，在浏览器里打开；回复里用一句话说图画的是什么，并给出生成的 HTML 路径。
+3. 要交给别人看的成品（HTML 文件、Artifact）：图优先写声明式源码（如 Mermaid），坐标交给布局引擎算，不手算。必须手写 SVG 时，渲染后截图核对箭头落点和文字是否出框。
+
 - 图、卡片和网页里的判断同样标证据等级；排版不能把推测变成定论。
-- 一句只说一件事。内部代号首次出现时换成大白话，或附一句解释。同一个东西全文只用一个叫法。
+- 句子按 ASD-STE100（简化技术英语）的规则写，中文同样适用。一句只说一件事。内部代号首次出现时换成大白话，或附一句解释。同一个东西全文只用一个叫法。范围、区间和前提条件照原样保留，不压成单个值。有因果关系的几句留在同一段，不拆成逐条列表。
 
 ## 收尾
 
@@ -515,7 +540,7 @@ _GENERIC_STANDARDS = """
 
 完成一项有改动的任务时，回复按以下四块依次写：
 
-1. **结果**：一句话结论，不把推理过程当结论。「先行」只管顺序、不豁免验证：证据不够时就写「未查实，下一步查 X」；没有证据不得声称完成。
+1. **结果**：一句话结论，不把推理过程当结论。满足「呈现形式」的出图条件时，图紧跟在这句结论后面。「先行」只管顺序、不豁免验证：证据不够时就写「未查实，下一步查 X」；没有证据不得声称完成。
 2. **要你定**：编号列出需要用户决定或确认的事项，含所做的假设；每条一句，附推荐。没有就写"无"。
 3. **你没要求的改动**：超出或偏离用户要求的地方，每条一句，并说明可以撤回。没有就省略。
 4. **局限**：失败、跳过、未完成和未覆盖的风险，多条时按严重性排序。它们影响用户决定，留在回复里，不挪进记录。没有就省略。
@@ -531,7 +556,9 @@ def _managed_content() -> str:
 - 用户明确说“不使用 Harness”时必须直接执行，不得暗中恢复旧流程。
 - 只有缺少的项目事实会改变目标、范围、方案或验收时才运行 knowledge query；需要长期维护的事实才进入 Knowledge 资产生命周期。
 - 简单任务不生成方案；复杂、跨模块、高风险或用户明确要求时才走 Plan 与 Acceptance 资产流程，命令与结算顺序见"方案、知识与验收资产"。
-- 验收以真实功能为中心：能运行聚焦测试、接口、页面、应用、构建或安装流程时运行最小充分流程；交付物要被别人照步骤安装或使用时，复制到干净目录、照自己写的步骤跑一遍；改动产生运行态行为（页面、接口、应用、命令或安装流程）的任务完成后，agent 必须自己走一遍详细的运行态验证（模拟器/本地联调，可用 mock 数据），确认功能流程正常、视觉与交互对用户友好，发现不友好之处直接重新优化并复验，不把功能、视觉或交互体验的验证推给用户；纯文档、只读或不改变行为的任务只做与改动对应的验证，非运行态交付物按接收方的用法验证：方案沿执行路径推演一遍，找第一个卡住的步骤及其代价；核对换一条独立路径重算，看是否收敛到同一答案；文档以零基础读者身份从头读一遍，找出用到但没给的前提；仅真实硬件、系统权限等本地确实无法运行的层准备最低成本环境交用户最短确认。
+- 验收以真实功能为中心：能运行聚焦测试、接口、页面、应用、构建或安装流程时运行最小充分流程；交付物要被别人照步骤安装或使用时，复制到干净目录、照自己写的步骤跑一遍；改动产生运行态行为（页面、接口、应用、命令或安装流程）的任务完成后，agent 必须自己走一遍详细的运行态验证（模拟器/本地联调，可用 mock 数据），确认功能流程正常、视觉与交互对用户友好，\
+发现不友好之处直接重新优化并复验，不把功能、视觉或交互体验的验证推给用户；纯文档、只读或不改变行为的任务只做与改动对应的验证，非运行态交付物按接收方的用法验证：方案沿执行路径推演一遍，找第一个卡住的步骤及其代价；核对换一条独立路径重算，看是否收敛到同一答案；文档以零基础读者身份从头读一遍，找出用到但没给的前提；\
+仅真实硬件、系统权限等本地确实无法运行的层准备最低成本环境交用户最短确认。
 - 高风险动作使用原生授权与沙箱，不建立第二套 Harness Gate 或授权协议。
 - Plan/Knowledge/Acceptance/ADR 的输入 JSON 形状、必填字段与 --dry-run 预检见 python3 scripts/harness.py <cmd> --help；校验失败的报错直接附期望形状；一次性输入 JSON 写入 `{TASK_INPUTS_RELATIVE}/`（不入库、升级不清理）。
 - 预计跨多批次或可能经历上下文压缩的长任务，把进度清单写入 `{TASKS_RELATIVE}/<任务名>.md`（不入库、升级不清理）：完成一项勾一项，新发现的事项随时补进去，查进度以这个文件为准，不以对话记录为准。有 Plan 的任务在清单开头写明 Plan 路径，条目按 Plan 的步骤或批次列出、只记进度，不复述 Plan 内容；Plan 是冻结合同，进度不写回 Plan。
@@ -1902,6 +1929,10 @@ def settle_deprecated_plan(
         atomic_write_text(index_path, updated_index)
         changed.append(PLAN_INDEX_RELATIVE)
     changed.extend(rewrite_archived_plan_links(target, basename))
+    try:
+        changed.extend(follow_archived_refs(target, PLAN_DOCS_RELATIVE, basename))
+    except AssetError as exc:
+        raise translate_asset_error(exc) from exc
     return plan_json, document, list(dict.fromkeys(changed))
 
 
@@ -2421,7 +2452,7 @@ ACCEPTANCE_SETTLE_INPUT_NOTES = (
     "records 为空数组等价于不传 --input；单条记录按状态必填规则与 acceptance record 完全一致；",
     "records 内 criterion_id 不得重复，且目标 criterion 必须当前 pending；",
     "成功时返回 payload 追加 recorded/record_ids 便于核对。",
-)
+) + ACCEPTANCE_SETTLE_STATUS_NOTES
 
 
 def read_settle_input(
@@ -3269,7 +3300,8 @@ def apply_local_only_dirs(target: Path) -> list[str]:
     项目内，此前没有约定位置；1.x 运行态目录 .docs-harness/task-inputs/ 在
     LEGACY_RUNTIME_NAMES 内，project upgrade 必清，用它会反复丢文件。
     tasks/（2.19.0）：长任务的进度清单，上下文压缩后以文件为准。
-    reports/（2.26.0）：收尾记录，回复只给路径，证据留给日后追查。三者都不在该元组内，升级不清理。
+    reports/（2.26.0）：收尾记录，回复只给路径，证据留给日后追查。
+    views/：view 命令写出的 Mermaid 页面（渲染产物；常量真源在 diagram_view）。四者都不在该元组内，升级不清理。
 
     嵌套 .gitignore 写法与 usage_log._GITIGNORE_CONTENT 同口径，这是它的第 2 次出现：
     新增目录只进 LOCAL_ONLY_DIRS，不另写一份；第 3 次出现时抽公共函数（编码质量规范第 2、10 条）。
@@ -4512,6 +4544,33 @@ def command_usage(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         ) from exc
 
 
+def command_view(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    """view 的 CLI 投影：渲染、落盘与打开在 diagram_view，这里只把异常映射成错误码。
+
+    UnicodeDecodeError 是 ValueError 的子类，必须排在 ValueError 之前捕获。
+    """
+    target = safe_target(args.target)
+    try:
+        written = write_view(target, Path(args.source).expanduser().resolve())
+    except FileNotFoundError as exc:
+        raise HarnessError(str(exc), code="view_source_missing") from exc
+    except UnicodeDecodeError as exc:
+        raise HarnessError(f"Mermaid 源文件不是 UTF-8：{args.source}", code="view_source_not_utf8") from exc
+    except ValueError as exc:
+        raise HarnessError(str(exc), code="view_source_empty") from exc
+    relative = written.relative_to(target).as_posix()
+    if args.open:
+        try:
+            open_in_browser(written)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise HarnessError(
+                f"页面已写入 {relative}，但无法用系统浏览器打开：{exc}",
+                code="view_open_failed",
+                extra_payload={"path": relative},
+            ) from exc
+    return 0, {"status": "written", "path": relative, "opened": args.open}
+
+
 def command_self_test(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     target = safe_target(args.target)
     config = project_config(target)
@@ -4741,7 +4800,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="仅校验（仅 create）：一次性报告全部输入错误与冲突，不写任何文件",
     )
     acceptance.add_argument("--acceptance")
-    acceptance.add_argument("--status", choices=("passed", "failed", "superseded"))
+    acceptance.add_argument("--status", choices=ACCEPTANCE_SETTLE_STATUSES)
     acceptance.add_argument("--replacement")
     acceptance.add_argument("--user-confirmed", action="store_true")
     acceptance.add_argument("--reaccept", action="store_true")
@@ -4804,6 +4863,13 @@ def build_parser() -> argparse.ArgumentParser:
     usage.add_argument(
         "--days", type=int, default=USAGE_REPORT_DEFAULT_DAYS, help="统计窗口天数（正整数，默认 %(default)s）"
     )
+
+    view = commands.add_parser(
+        "view", help=f"把 Mermaid 源码渲染成 {VIEWS_RELATIVE}/ 下的独立 HTML 页面"
+    )
+    view.add_argument("source", help="Mermaid 源码文件，整个文件是一张图（约定 .mmd；相对路径按当前目录解析）")
+    add_target(view)
+    view.add_argument("--open", action="store_true", help="写完后用系统默认浏览器打开")
 
     self_test = commands.add_parser("self-test", help=f"运行 {VERSION} 内置自检")
     add_target(self_test)
@@ -4898,6 +4964,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     started = time.monotonic()
     try:
+        if getattr(args, "dry_run", False) and args.action != "create":
+            raise HarnessError(
+                f"{args.command} {args.action} 不支持 --dry-run（仅 create 有预检），去掉后重跑",
+                code="dry_run_unsupported",
+            )
         if args.command == "knowledge":
             knowledge_handlers = {
                 "create": knowledge_create,
@@ -4940,6 +5011,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             code, payload = command_structure(args)
         elif args.command == "usage":
             code, payload = command_usage(args)
+        elif args.command == "view":
+            code, payload = command_view(args)
         else:
             code, payload = command_self_test(args)
         emit(payload, args.json)

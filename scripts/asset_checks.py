@@ -174,7 +174,10 @@ def check_cross_asset_relations(target: Path) -> dict[str, Any]:
         if acceptance.get("status") != "pending":
             continue
         if "archive" in plan_path.relative_to(target).parts:
-            warnings.append(f"WARN: {relative}: pending Acceptance 指向已归档 Plan")
+            warnings.append(
+                f"WARN: {relative}: pending Acceptance 指向已归档 Plan"
+                "（方案已废弃或工作已迁出时，用 acceptance settle --status deprecated 归档）"
+            )
         if _is_stale(acceptance.get("updated_at"), now):
             warnings.append(
                 f"WARN: {relative}: pending 超过 {ASSET_STALE_DAYS} 天仍未结项"

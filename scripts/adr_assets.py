@@ -17,6 +17,7 @@ from managed_assets import (
     seal_asset,
     write_asset,
 )
+from knowledge_assets import follow_archived_refs
 
 
 ADR_INPUT_SCHEMA = "docs-harness/adr-input/v1"
@@ -174,7 +175,8 @@ def settle(target: Path, raw_asset: str, status: str, replacement: str | None, n
     write_asset(target, ADR_SPEC, source, document, asset, render_markdown(asset), ADR_STATUS_SUPERSEDED if status == "superseded" else ADR_STATUS_DEPRECATED)
     archived_source, archived_document = archive_asset(target, ADR_SPEC, source, document)
     rewritten = rewrite_links(target, ADR_SPEC, source.stem, markdown_files)
-    return {"status": status, "adr_ref": archived_source.relative_to(target).as_posix(), "document_ref": archived_document.relative_to(target).as_posix(), "rewritten_links": rewritten}
+    followed = follow_archived_refs(target, ADR_SPEC.root, source.stem)
+    return {"status": status, "adr_ref": archived_source.relative_to(target).as_posix(), "document_ref": archived_document.relative_to(target).as_posix(), "rewritten_links": rewritten, "rewritten_source_refs": followed}
 
 
 def check(target: Path) -> dict[str, Any]:

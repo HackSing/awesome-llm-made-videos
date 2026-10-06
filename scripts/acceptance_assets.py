@@ -19,6 +19,7 @@ from managed_assets import (
     seal_asset,
     write_asset,
 )
+from knowledge_assets import follow_archived_refs
 from plan_governance import (
     PLAN_SCHEMAS,
     PlanGovernanceError,
@@ -31,7 +32,14 @@ ACCEPTANCE_TARGET_INPUT_SCHEMA = "docs-harness/acceptance-target-input/v1"
 ACCEPTANCE_ASSET_SCHEMA = "docs-harness/acceptance-asset/v1"
 # settle --input 批量带入 pending 记录的输入 Schema：harness 校验顶层形状，本模块 settle 消费记录。
 ACCEPTANCE_SETTLE_INPUT_SCHEMA = "docs-harness/acceptance-settle-input/v1"
-ACCEPTANCE_SETTLE_STATUSES = ("passed", "failed", "superseded")
+ACCEPTANCE_SETTLE_STATUSES = ("passed", "failed", "superseded", "deprecated")
+# settle --status 的 --help 说明，与上面的状态元组同处维护。
+ACCEPTANCE_SETTLE_STATUS_NOTES = (
+    "--status：passed|failed 须与逐条聚合状态一致；superseded 需 --replacement 指向本仓库另一份活跃 Acceptance，并归档；",
+    "deprecated 用于方案废弃或工作迁出本仓库：可选 --replacement 写一行去向（如外部仓库的待办路径），未完成的 criterion 原样留档，退出 Plan 反向登记并归档。",
+)
+# 结项即归档的状态：不再要求与逐条聚合一致，退出 Plan 反向登记后移入 archive/。
+ACCEPTANCE_ARCHIVED_STATUSES = frozenset({"superseded", "deprecated"})
 ACCEPTANCE_TYPES = {"contract_check", "behavior_acceptance", "user_acceptance"}
 ACCEPTANCE_LAYERS = {
     "L1": "source_contract",
@@ -53,6 +61,7 @@ STATUS_LABELS = {
     "passed": "已验收-仅追溯",
     "failed": "有效（验收失败）",
     "superseded": "已废弃-被替代",
+    "deprecated": "已废弃",
 }
 
 ACCEPTANCE_SPEC = AssetSpec(
@@ -273,7 +282,7 @@ def validate_asset(value: dict[str, Any]) -> None:
         ids.append(criterion["id"])
     if len(ids) != len(set(ids)):
         raise AssetError("Acceptance criterion id 重复", "acceptance_asset_invalid")
-    if value["status"] != "superseded" and value["status"] != _aggregate(value["criteria"]):
+    if value["status"] not in ACCEPTANCE_ARCHIVED_STATUSES and value["status"] != _aggregate(value["criteria"]):
         raise AssetError("Acceptance 总体状态与 criteria 不一致", "acceptance_asset_invalid")
 
 
@@ -296,7 +305,10 @@ def render_markdown(asset: dict[str, Any]) -> str:
         refs.append(f"- 关联方案：`{asset['plan_ref']}`")
     if asset.get("knowledge_refs"):
         refs.append("- 关联知识：" + "、".join(f"`{item}`" for item in asset["knowledge_refs"]))
-    if asset.get("replacement"):
+    if asset["status"] == "deprecated":
+        destination = asset.get("replacement")
+        refs.append(f"- 去向：`{destination}`" if destination else "- 去向：未注明")
+    elif asset.get("replacement"):
         refs.append(f"- 替代资产：`{asset['replacement']}`")
     return (
         f"> 状态：{STATUS_LABELS[asset['status']]}\n{ACCEPTANCE_SPEC.marker}\n\n# {asset['title']}\n\n"
@@ -392,6 +404,18 @@ def _match_record_to_criterion(criterion: dict[str, Any], record_value: dict[str
             raise AssetError("验收记录与 criterion 的 evidence_layer 不一致", "acceptance_record_mismatch")
 
 
+def _deprecation_destination(raw: str | None) -> str | None:
+    """deprecated 的 replacement 是一行自由文本去向（如工作迁出后的外部仓库路径），
+    不解析为本仓库资产；渲染在行内代码里，所以拒绝换行与反引号。"""
+    if raw is None or not raw.strip():
+        return None
+    if "\n" in raw or "\r" in raw or "`" in raw:
+        raise AssetError(
+            "deprecated 的 replacement 必须是单行文本且不含反引号", "acceptance_replacement_invalid"
+        )
+    return raw.strip()
+
+
 def _apply_record(criterion: dict[str, Any], record_value: dict[str, Any]) -> None:
     criterion["records"].append(record_value)
     criterion["status"] = "passed" if record_value["status"] == "passed" else "failed" if record_value["status"] == "failed" else "pending"
@@ -477,7 +501,9 @@ def settle(
         raise AssetError("结项状态与逐条验收聚合状态不一致", "acceptance_settle_mismatch")
     if status == "superseded" and not replacement:
         raise AssetError("superseded 必须提供 replacement", "acceptance_replacement_required")
-    if replacement:
+    if status == "deprecated":
+        replacement = _deprecation_destination(replacement)
+    elif replacement:
         replacement_source, _, replacement_archived = asset_pair(target, replacement, ACCEPTANCE_SPEC)
         if replacement_source == source:
             raise AssetError("replacement 不能指向自身", "acceptance_replacement_invalid")
@@ -486,17 +512,18 @@ def settle(
     revision, history = _next_revision(current, now)
     current.update({"status": status, "replacement": replacement, "revision": revision, "revision_history": history, "updated_at": now, "settled_at": now})
     asset = seal_asset(current)
-    # superseded 归档动作前先退出 Plan 反向登记(Plan 可能已被 settle deprecated 移入
-    # archive/,按归档位置回退解析);解析失败即中止,不产生半完成状态。后续任何失败
-    # 补偿回登记,与 create 的回滚方向对称。
+    # superseded/deprecated 归档动作前先退出 Plan 反向登记(Plan 可能已被 settle deprecated
+    # 移入 archive/,按归档位置回退解析);解析失败即中止,不产生半完成状态。后续任何失败
+    # 补偿回登记,与 create 的回滚方向对称。退出登记后该验收不再计入 Plan 的已结项验收。
+    archiving = status in ACCEPTANCE_ARCHIVED_STATUSES
     unlinked = False
-    if status == "superseded" and current.get("plan_ref"):
+    if archiving and current.get("plan_ref"):
         unlinked = _change_plan_backref(
             target, current["plan_ref"], raw_asset, add=False, allow_archived_plan=True
         )
     try:
         write_asset(target, ACCEPTANCE_SPEC, source, document, asset, render_markdown(asset), STATUS_LABELS[status])
-        if status != "superseded":
+        if not archiving:
             payload = {"status": status, "acceptance_ref": raw_asset, "revision": revision}
         else:
             archived_source, archived_document = archive_asset(target, ACCEPTANCE_SPEC, source, document)
@@ -508,6 +535,9 @@ def settle(
                 target, current["plan_ref"], raw_asset, add=True, allow_archived_plan=True
             )
         raise
+    if archiving:
+        # 放在补偿块之外：此时归档已完成，改写失败不应回登记 Plan 反向引用。
+        payload["rewritten_source_refs"] = follow_archived_refs(target, ACCEPTANCE_SPEC.root, source.stem)
     if records:
         payload["recorded"] = recorded
         payload["record_ids"] = record_ids

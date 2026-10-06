@@ -2,7 +2,7 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "profile",
   "id": "architecture",
-  "version": "2.26.2",
+  "version": "2.28.0",
   "fields": [
     {"id": "current_constraints", "label": "当前约束", "required": true},
     {"id": "alternatives", "label": "候选方案", "required": true},

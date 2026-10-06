@@ -11,6 +11,8 @@ from managed_assets import (
     AssetSpec,
     archive_asset,
     asset_pair,
+    atomic_write_json,
+    atomic_write_text,
     check_assets,
     load_asset,
     output_pair,
@@ -27,6 +29,7 @@ KNOWLEDGE_STATUS_DEPRECATED = "已废弃"
 KNOWLEDGE_STATUS_SUPERSEDED = "已废弃-被替代"
 KNOWLEDGE_SETTLE_STATUSES = ("deprecated", "superseded")
 FACT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]{1,63}$")
+LINE_SUFFIX_PATTERN = re.compile(r":\d+$")
 
 KNOWLEDGE_SPEC = AssetSpec(
     kind="knowledge",
@@ -61,8 +64,14 @@ def _symbols(value: Any) -> list[str]:
     return symbols
 
 
+def _split_ref(raw: str) -> tuple[str, str]:
+    """source_ref 拆成路径与可选的 `:行号` 后缀。"""
+    match = LINE_SUFFIX_PATTERN.search(raw)
+    return (raw[: match.start()], match.group()) if match else (raw, "")
+
+
 def _source_path(target: Path, raw: str) -> Path:
-    relative = raw.rsplit(":", 1)[0] if re.search(r":\d+$", raw) else raw
+    relative, _ = _split_ref(raw)
     path = Path(relative)
     if path.is_absolute() or ".." in path.parts:
         raise AssetError("source_refs 必须是项目内相对路径", "knowledge_source_invalid")
@@ -245,7 +254,46 @@ def settle(target: Path, raw_asset: str, status: str, replacement: str | None, n
     write_asset(target, KNOWLEDGE_SPEC, source, document, asset, render_markdown(asset), KNOWLEDGE_STATUS_SUPERSEDED if status == "superseded" else KNOWLEDGE_STATUS_DEPRECATED)
     archived_source, archived_document = archive_asset(target, KNOWLEDGE_SPEC, source, document)
     rewritten = rewrite_links(target, KNOWLEDGE_SPEC, source.stem, markdown_files)
-    return {"status": status, "knowledge_ref": archived_source.relative_to(target).as_posix(), "document_ref": archived_document.relative_to(target).as_posix(), "rewritten_links": rewritten}
+    followed = follow_archived_refs(target, KNOWLEDGE_SPEC.root, source.stem)
+    return {"status": status, "knowledge_ref": archived_source.relative_to(target).as_posix(), "document_ref": archived_document.relative_to(target).as_posix(), "rewritten_links": rewritten, "rewritten_source_refs": followed}
+
+
+def _moved_ref(ref: str, moves: dict[str, str]) -> str:
+    relative, suffix = _split_ref(ref)
+    moved = moves.get(relative)
+    return moved + suffix if moved else ref
+
+
+def follow_archived_refs(target: Path, root: str, basename: str) -> list[str]:
+    """`<root>/<basename>.json|.md` 移入 `archive/` 后，改写活跃与归档 Knowledge 中指向旧路径的 source_refs。
+
+    只改引用路径（保留 `:行号`），不改事实、revision 与时间戳；重封指纹并重渲染 Markdown 投影。
+    受影响资产先全部读取校验再写入；指纹无效的资产不重封（重封会掩盖手工篡改），直接报错。
+    """
+    moves = {f"{root}/{basename}{suffix}": f"{root}/archive/{basename}{suffix}" for suffix in (".json", ".md")}
+    rewrites: list[tuple[Path, dict[str, Any]]] = []
+    for directory in (target / KNOWLEDGE_SPEC.root, target / KNOWLEDGE_SPEC.archive):
+        for path in sorted(directory.glob("*.json")):
+            if not any(old in path.read_text(encoding="utf-8") for old in moves):
+                continue
+            try:
+                asset = load_asset(path, KNOWLEDGE_SPEC)
+            except AssetError as exc:
+                raise AssetError(
+                    f"{path.relative_to(target).as_posix()}：{exc}；它提及 {root}/{basename}，"
+                    f"修复前不会改写其 source_refs，归档已完成，修复后按 {root}/archive/{basename} 改引用",
+                    exc.code,
+                ) from exc
+            facts = [
+                {**fact, "source_refs": [_moved_ref(ref, moves) for ref in fact["source_refs"]]}
+                for fact in asset["facts"]
+            ]
+            if facts != asset["facts"]:
+                rewrites.append((path, seal_asset({**asset, "facts": facts})))
+    for path, asset in rewrites:
+        atomic_write_json(path, asset)
+        atomic_write_text(path.with_suffix(".md"), render_markdown(asset))
+    return [path.relative_to(target).as_posix() for path, _ in rewrites]
 
 
 def check(target: Path) -> dict[str, Any]:
