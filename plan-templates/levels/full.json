@@ -2,21 +2,98 @@
   "schema_version": "docs-harness/plan-template/v3",
   "kind": "level",
   "id": "full",
-  "version": "2.28.0",
+  "version": "2.32.0",
   "fields": [
-    {"id": "title", "label": "方案标题", "required": true},
-    {"id": "key_symbols", "label": "关键符号（2-4 个）", "required": true},
-    {"id": "background", "label": "背景", "required": true},
-    {"id": "objective", "label": "目标", "required": true},
-    {"id": "non_goals", "label": "非目标", "required": true},
-    {"id": "success_criteria", "label": "成功标准", "required": true},
-    {"id": "execution_scope", "label": "执行范围", "required": true},
-    {"id": "implementation", "label": "执行内容", "required": true},
-    {"id": "module_interfaces", "label": "模块划分与接口骨架", "required": true, "guidance": "列出新增/修改的模块：各自职责一句话、对外接口符号（函数/类/命令签名）、复用的现有代码路径。实施时骨架先行：先落文件与接口签名（空实现），再分批填充逻辑；全局结构在此冻结，实施不得绕开。"},
-    {"id": "acceptance_plan", "label": "验收方案", "required": true},
-    {"id": "acceptance_required", "label": "是否需要 Acceptance 资产闭环", "required": true, "guidance": "只填写 true 或 false；true 时必须先完成 acceptance create/record/settle，plan settle 才会放行。"},
-    {"id": "knowledge_impact", "label": "Knowledge 影响", "required": true, "guidance": "只填写 updated 或 unchanged；updated 需在结算输入列出活跃 Knowledge，unchanged 需说明理由。"},
-    {"id": "constraints", "label": "约束", "required": false},
-    {"id": "risks_and_rollback", "label": "风险与回滚", "required": false}
+    {
+      "id": "title",
+      "label": "方案标题",
+      "required": true
+    },
+    {
+      "id": "key_symbols",
+      "label": "关键符号（2-4 个）",
+      "required": true
+    },
+    {
+      "id": "background",
+      "label": "背景",
+      "required": true
+    },
+    {
+      "id": "objective",
+      "label": "目标",
+      "required": true
+    },
+    {
+      "id": "non_goals",
+      "label": "非目标",
+      "required": true
+    },
+    {
+      "id": "success_criteria",
+      "label": "成功标准",
+      "required": true
+    },
+    {
+      "id": "execution_scope",
+      "label": "执行范围",
+      "required": true
+    },
+    {
+      "id": "implementation",
+      "label": "执行内容",
+      "required": true
+    },
+    {
+      "id": "progress",
+      "label": "执行进度",
+      "required": false,
+      "guidance": "可选：{\"completed_steps\": [\"已完成步骤\"], \"remaining_steps\": [\"未完成步骤\"]}。remaining_steps 非空时，plan check 不再因关键符号全部命中而提示“代码很可能已交付”。"
+    },
+    {
+      "id": "process_flowchart",
+      "label": "流程图",
+      "required": true,
+      "guidance": "必填 Mermaid flowchart（```mermaid 代码块）：主路径、关键分支、失败与回滚；侧重系统/实现视角，与 profile 内更细的流程字段互补。"
+    },
+    {
+      "id": "ux_journey",
+      "label": "体验/操作者路径",
+      "required": true,
+      "guidance": "从最终使用者或操作者视角写端到端路径：入口 → 关键步骤 → 结果与反馈（含空态/错误态要点）；非 UI 任务写集成方、运维或 API 调用方路径。profile 已有 user_flow 等字段时，本字段写跨场景总路径，细节可指向该字段。"
+    },
+    {
+      "id": "module_interfaces",
+      "label": "模块划分与接口骨架",
+      "required": true,
+      "guidance": "列出新增/修改的模块：各自职责一句话、对外接口符号（函数/类/命令签名）、复用的现有代码路径。实施时骨架先行：先落文件与接口签名（空实现），再分批填充逻辑；全局结构在此冻结，实施不得绕开。"
+    },
+    {
+      "id": "acceptance_plan",
+      "label": "验收方案",
+      "required": true
+    },
+    {
+      "id": "acceptance_required",
+      "label": "是否需要 Acceptance 资产闭环",
+      "required": true,
+      "guidance": "只填写 true 或 false；true 时必须先完成 acceptance create/record/settle，plan settle 才会放行。"
+    },
+    {
+      "id": "knowledge_impact",
+      "label": "Knowledge 影响",
+      "required": true,
+      "guidance": "只填写 updated 或 unchanged；updated 需在结算输入列出活跃 Knowledge，unchanged 需说明理由。"
+    },
+    {
+      "id": "constraints",
+      "label": "约束",
+      "required": false
+    },
+    {
+      "id": "risks_and_rollback",
+      "label": "风险与回滚",
+      "required": false
+    }
   ]
 }

@@ -29,6 +29,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from symbol_check import symbol_hit
+
 FILE_RED_LINE = 600
 FUNC_RED_LINE = 60
 OVERSIZE_FILE_GROWTH_ALERT = 50
@@ -98,19 +100,19 @@ def _untracked_files(target: Path) -> list[str]:
     return _zsplit(result.stdout)
 
 
-def _changed_code_files(target: Path) -> dict[str, str] | None:
+def _changed_code_files(target: Path, base: str = "HEAD") -> dict[str, str] | None:
     """本次改动的代码文件：{相对路径: "A"|"M"}；非 git 仓库返回 None。
 
-    对比基线是 HEAD（含暂存与未暂存），未跟踪文件按新增计；空仓（无 HEAD）时
-    全部 tracked+untracked 代码文件按新增处理。
+    对比基线默认 HEAD（含暂存与未暂存），可用 --base 指定任务起始提交；
+    未跟踪文件按新增计；空仓（无基线）时全部 tracked+untracked 代码文件按新增处理。
     """
     probe = _git(target, "rev-parse", "--is-inside-work-tree")
     if probe is None or probe.returncode != 0:
         return None
     changed: dict[str, str] = {}
-    head = _git(target, "rev-parse", "--verify", "HEAD")
-    if head is not None and head.returncode == 0:
-        diff = _git(target, "diff", "HEAD", "--name-status", "--no-renames", "-z")
+    baseline = _git(target, "rev-parse", "--verify", base)
+    if baseline is not None and baseline.returncode == 0:
+        diff = _git(target, "diff", base, "--name-status", "--no-renames", "-z")
         if diff is not None and diff.returncode == 0:
             tokens = _zsplit(diff.stdout)
             for status, relative in zip(tokens[::2], tokens[1::2]):
@@ -137,11 +139,15 @@ def _read_current(target: Path, relative: str) -> str:
     return (target / relative).read_text(encoding="utf-8", errors="replace")
 
 
-def _read_head(target: Path, relative: str) -> str | None:
-    result = _git(target, "show", f"HEAD:{relative}")
+def _read_revision(target: Path, revision: str, relative: str) -> str | None:
+    result = _git(target, "show", f"{revision}:{relative}")
     if result is None or result.returncode != 0:
         return None
     return result.stdout.decode("utf-8", errors="replace")
+
+
+def _read_head(target: Path, relative: str) -> str | None:
+    return _read_revision(target, "HEAD", relative)
 
 
 def _python_functions(source: str) -> dict[str, int] | None:
@@ -378,7 +384,7 @@ def _codemap_consistency_warnings(target: Path, entries: list[tuple[str, list[st
             continue
         content = path.read_text(encoding="utf-8", errors="replace")
         for symbol in symbols:
-            if symbol not in content:
+            if not symbol_hit(content, symbol, path.suffix):
                 warnings.append(
                     f"CODEMAP 中 {module_path} 的公开接口 `{symbol}` "
                     "在源码中不存在，索引已失活，同步更新条目"
@@ -399,7 +405,10 @@ def _codemap_registration_warnings(
 
 
 def check_structure(
-    target: Path, *, exempt: frozenset[str] = frozenset()
+    target: Path,
+    *,
+    exempt: frozenset[str] = frozenset(),
+    base: str = "HEAD",
 ) -> dict[str, Any]:
     """assets-check 第六 checker：增量体量 + CODEMAP 一致性，全部 WARN 级。
 
@@ -409,7 +418,7 @@ def check_structure(
     _codemap_consistency_warnings 不受 exempt 影响：它校验的是 CODEMAP 里已登记条目
     的存活性，登记与否是项目自己的选择。
     """
-    changed = _changed_code_files(target)
+    changed = _changed_code_files(target, base)
     if changed is None:
         return {"status": "passed", "failures": [], "warnings": [], "checked": 0}
     changed = {
@@ -421,7 +430,7 @@ def check_structure(
     sources: dict[str, tuple[str, str | None]] = {}
     for relative, status in sorted(changed.items()):
         current = _read_current(target, relative)
-        head = _read_head(target, relative) if status == "M" else None
+        head = _read_revision(target, base, relative) if status == "M" else None
         sources[relative] = (current, head)
         warnings.extend(_file_size_warnings(relative, status, current, head))
     spans_by_file, ts_reason = _collect_function_spans(target, sources)

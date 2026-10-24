@@ -20,6 +20,13 @@ from managed_assets import (
     write_asset,
 )
 from knowledge_assets import follow_archived_refs
+from acceptance_render import render_markdown
+from acceptance_diagnostics import (
+    criterion_not_pending_error,
+    find_criterion,
+    match_record_to_criterion,
+    settle_mismatch_error,
+)
 from plan_governance import (
     PLAN_SCHEMAS,
     PlanGovernanceError,
@@ -72,6 +79,7 @@ ACCEPTANCE_SPEC = AssetSpec(
     index_end="<!-- docs-harness:acceptance-index:end -->",
     marker="<!-- docs-harness:acceptance-document/v1 -->",
     schema=ACCEPTANCE_ASSET_SCHEMA,
+    status_labels=STATUS_LABELS,
     readme="""# 验收资产
 
 本目录保存复杂任务的验收目标、逐条标准、证据层级和结果。JSON 是可审计真源，
@@ -286,38 +294,6 @@ def validate_asset(value: dict[str, Any]) -> None:
         raise AssetError("Acceptance 总体状态与 criteria 不一致", "acceptance_asset_invalid")
 
 
-def _criterion_markdown(criterion: dict[str, Any]) -> str:
-    records = criterion["records"]
-    latest = records[-1] if records else None
-    evidence = "、".join(f"`{ref}`" for ref in latest.get("evidence_refs", [])) if latest else "尚无"
-    return (
-        f"### `{criterion['id']}` {criterion['title']}\n\n"
-        f"- 状态：{criterion['status']}\n- 类型：{criterion['acceptance_type']}\n"
-        f"- 层级：{criterion['layer']}\n- 证据：{evidence}"
-    )
-
-
-def render_markdown(asset: dict[str, Any]) -> str:
-    symbols = "、".join(f"`{item}`" for item in asset["key_symbols"])
-    criteria = "\n\n".join(_criterion_markdown(item) for item in asset["criteria"])
-    refs = []
-    if asset.get("plan_ref"):
-        refs.append(f"- 关联方案：`{asset['plan_ref']}`")
-    if asset.get("knowledge_refs"):
-        refs.append("- 关联知识：" + "、".join(f"`{item}`" for item in asset["knowledge_refs"]))
-    if asset["status"] == "deprecated":
-        destination = asset.get("replacement")
-        refs.append(f"- 去向：`{destination}`" if destination else "- 去向：未注明")
-    elif asset.get("replacement"):
-        refs.append(f"- 替代资产：`{asset['replacement']}`")
-    return (
-        f"> 状态：{STATUS_LABELS[asset['status']]}\n{ACCEPTANCE_SPEC.marker}\n\n# {asset['title']}\n\n"
-        f"- 修订：{asset['revision']}\n- 关键符号：{symbols}\n"
-        f"- 资产指纹：`{asset['asset_fingerprint']}`\n" + "\n".join(refs) +
-        f"\n\n## 验收目标\n\n{asset['objective']}\n\n## 验收标准\n\n{criteria}\n"
-    )
-
-
 def _change_plan_backref(
     target: Path,
     plan_ref: str,
@@ -374,34 +350,19 @@ def _aggregate(criteria: Sequence[dict[str, Any]]) -> str:
     return "pending"
 
 
-def _next_revision(current: dict[str, Any], now: str) -> tuple[int, list[dict[str, Any]]]:
+def _next_revision(
+    current: dict[str, Any], now: str, *, reason: str | None = None
+) -> tuple[int, list[dict[str, Any]]]:
     history = list(current.get("revision_history", []))
-    history.append({"revision": current["revision"], "asset_fingerprint": current["asset_fingerprint"], "updated_at": current["updated_at"]})
+    entry = {
+        "revision": current["revision"],
+        "asset_fingerprint": current["asset_fingerprint"],
+        "updated_at": current["updated_at"],
+    }
+    if reason:
+        entry["amend_reason"] = reason
+    history.append(entry)
     return current["revision"] + 1, history
-
-
-def _find_criterion(current: dict[str, Any], criterion_id: str) -> dict[str, Any]:
-    criterion = next((item for item in current["criteria"] if item["id"] == criterion_id), None)
-    if criterion is None:
-        raise AssetError("criterion_id 不存在", "acceptance_criterion_missing")
-    return criterion
-
-
-def _match_record_to_criterion(criterion: dict[str, Any], record_value: dict[str, Any]) -> None:
-    """校验单条记录与目标 criterion 的三要素（acceptance_type/layer/evidence_layer 同层）。"""
-    for key in ("acceptance_type", "layer"):
-        if criterion[key] != record_value.get(key):
-            raise AssetError(f"验收记录与 criterion 的 {key} 不一致", "acceptance_record_mismatch")
-    criterion_evidence = criterion["evidence_layer"]
-    record_evidence = record_value.get("evidence_layer")
-    if criterion_evidence is None:
-        # contract_check / user_acceptance 无证据层：record 也必须为 None
-        if record_evidence is not None:
-            raise AssetError("验收记录与 criterion 的 evidence_layer 不一致", "acceptance_record_mismatch")
-    else:
-        # behavior_acceptance：同 L 层即接受（focused_test 与 repository_full_test 可互换）
-        if ACCEPTANCE_EVIDENCE_LAYERS.get(record_evidence) != criterion["layer"]:
-            raise AssetError("验收记录与 criterion 的 evidence_layer 不一致", "acceptance_record_mismatch")
 
 
 def _deprecation_destination(raw: str | None) -> str | None:
@@ -435,13 +396,10 @@ def _apply_settle_records(
         if criterion_id in seen:
             raise AssetError("settle 输入 criterion_id 重复", "acceptance_settle_duplicate_criterion")
         seen.add(criterion_id)
-        criterion = _find_criterion(current, criterion_id)
+        criterion = find_criterion(current, criterion_id)
         if criterion["status"] != "pending":
-            raise AssetError(
-                "settle 只接受当前 pending 的 criterion，已验收的改写请走 --reaccept",
-                "acceptance_settle_criterion_not_pending",
-            )
-        _match_record_to_criterion(criterion, record_value)
+            raise criterion_not_pending_error(current, criterion_id)
+        match_record_to_criterion(criterion, record_value, ACCEPTANCE_EVIDENCE_LAYERS)
         prepared.append((criterion, record_value))
     recorded: list[str] = []
     record_ids: list[str] = []
@@ -452,24 +410,67 @@ def _apply_settle_records(
     return recorded, record_ids
 
 
-def record(target: Path, raw_asset: str, criterion_id: str, record_value: dict[str, Any], now: str, reaccept: bool) -> dict[str, Any]:
+def record(
+    target: Path,
+    raw_asset: str,
+    criterion_id: str,
+    record_value: dict[str, Any],
+    now: str,
+    reaccept: bool,
+    dry_run: bool = False,
+) -> dict[str, Any]:
     source, document, archived = asset_pair(target, raw_asset, ACCEPTANCE_SPEC)
     if archived:
-        raise AssetError("归档 Acceptance 不可记录", "acceptance_archived")
+        raise AssetError(
+            "归档 Acceptance 不可记录",
+            "acceptance_archived",
+            next_action="归档资产只读；请新建 Acceptance 或改用活跃资产",
+        )
     current = load_asset(source, ACCEPTANCE_SPEC)
     validate_asset(current)
     if current.get("settled_at") and not reaccept:
-        raise AssetError("已结项 Acceptance 必须显式 --reaccept", "acceptance_reaccept_required")
+        raise AssetError(
+            "已结项 Acceptance 必须显式 --reaccept",
+            "acceptance_reaccept_required",
+            details={"acceptance_status": current["status"]},
+            next_action="确需重验时加 --reaccept；否则把新证据记到新的验收资产",
+        )
     if reaccept and current["status"] not in {"failed", "passed"}:
-        raise AssetError("只有已通过或失败的 Acceptance 可重验", "acceptance_reaccept_invalid")
-    criterion = _find_criterion(current, criterion_id)
-    _match_record_to_criterion(criterion, record_value)
+        raise AssetError(
+            "只有已通过或失败的 Acceptance 可重验",
+            "acceptance_reaccept_invalid",
+            details={"acceptance_status": current["status"]},
+            next_action="pending 资产直接 acceptance record；deprecated/superseded 资产需新建验收",
+        )
+    criterion = find_criterion(current, criterion_id)
+    match_record_to_criterion(criterion, record_value, ACCEPTANCE_EVIDENCE_LAYERS)
     _apply_record(criterion, record_value)
     revision, history = _next_revision(current, now)
     current.update({"status": _aggregate(current["criteria"]), "revision": revision, "revision_history": history, "updated_at": now, "settled_at": None})
     asset = seal_asset(current)
+    if dry_run:
+        return {
+            "status": "dry_run_valid",
+            "acceptance_ref": raw_asset,
+            "criterion_id": criterion_id,
+            "revision": revision,
+            "writes": "none",
+            "would_status": asset["status"],
+            "next_action": "去掉 --dry-run 后重跑以写入",
+        }
     write_asset(target, ACCEPTANCE_SPEC, source, document, asset, render_markdown(asset), STATUS_LABELS[asset["status"]])
     return {"status": asset["status"], "acceptance_ref": raw_asset, "criterion_id": criterion_id, "revision": revision}
+
+
+def _dry_run_settle_payload(raw_asset: str, status: str, revision: int, recorded: list[str]) -> dict[str, Any]:
+    return {
+        "status": "dry_run_valid",
+        "acceptance_ref": raw_asset,
+        "writes": "none",
+        "would_status": status,
+        "revision": revision,
+        "recorded": recorded,
+    }
 
 
 def settle(
@@ -481,6 +482,7 @@ def settle(
     markdown_files: Sequence[Path],
     records: Sequence[tuple[str, dict[str, Any]]] = (),
     objective: str | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     if status not in ACCEPTANCE_SETTLE_STATUSES:
         raise AssetError("Acceptance settle 状态无效", "acceptance_settle_invalid")
@@ -498,7 +500,7 @@ def settle(
         recorded, record_ids = _apply_settle_records(current, records)
         current["status"] = _aggregate(current["criteria"])
     if status in {"passed", "failed"} and current["status"] != status:
-        raise AssetError("结项状态与逐条验收聚合状态不一致", "acceptance_settle_mismatch")
+        raise settle_mismatch_error(current, status)
     if status == "superseded" and not replacement:
         raise AssetError("superseded 必须提供 replacement", "acceptance_replacement_required")
     if status == "deprecated":
@@ -512,6 +514,8 @@ def settle(
     revision, history = _next_revision(current, now)
     current.update({"status": status, "replacement": replacement, "revision": revision, "revision_history": history, "updated_at": now, "settled_at": now})
     asset = seal_asset(current)
+    if dry_run:
+        return _dry_run_settle_payload(raw_asset, status, revision, recorded)
     # superseded/deprecated 归档动作前先退出 Plan 反向登记(Plan 可能已被 settle deprecated
     # 移入 archive/,按归档位置回退解析);解析失败即中止,不产生半完成状态。后续任何失败
     # 补偿回登记,与 create 的回滚方向对称。退出登记后该验收不再计入 Plan 的已结项验收。

@@ -39,6 +39,11 @@ KNOWLEDGE_SPEC = AssetSpec(
     index_end="<!-- docs-harness:knowledge-index:end -->",
     marker="<!-- docs-harness:knowledge-document/v1 -->",
     schema=KNOWLEDGE_ASSET_SCHEMA,
+    status_labels={
+        "active": KNOWLEDGE_STATUS_ACTIVE,
+        "deprecated": KNOWLEDGE_STATUS_DEPRECATED,
+        "superseded": KNOWLEDGE_STATUS_SUPERSEDED,
+    },
     readme="""# 项目知识
 
 本目录保存由当前源码或项目文档证据支持的结构化事实。每项知识由同名 JSON 保存
@@ -168,7 +173,24 @@ def create(target: Path, value: Any, raw_output: str, now: str) -> dict[str, Any
         "updated_at": now,
     })
     write_asset(target, KNOWLEDGE_SPEC, output, document, asset, render_markdown(asset), KNOWLEDGE_STATUS_ACTIVE)
-    return {"status": "created", "knowledge_ref": raw_output, "document_ref": raw_output[:-5] + ".md", "revision": 1}
+    try:
+        active_conflicts = conflicts(target)
+    except AssetError as exc:
+        return {
+            "status": "created",
+            "knowledge_ref": raw_output,
+            "document_ref": raw_output[:-5] + ".md",
+            "revision": 1,
+            "conflicts": [],
+            "conflicts_error": str(exc),
+        }
+    return {
+        "status": "created",
+        "knowledge_ref": raw_output,
+        "document_ref": raw_output[:-5] + ".md",
+        "revision": 1,
+        "conflicts": active_conflicts,
+    }
 
 
 def update(target: Path, raw_asset: str, value: Any, now: str) -> dict[str, Any]:
@@ -190,7 +212,24 @@ def update(target: Path, raw_asset: str, value: Any, now: str) -> dict[str, Any]
         "updated_at": now,
     })
     write_asset(target, KNOWLEDGE_SPEC, source, document, asset, render_markdown(asset), KNOWLEDGE_STATUS_ACTIVE)
-    return {"status": "updated", "knowledge_ref": raw_asset, "revision": asset["revision"], "previous_fingerprint": current["asset_fingerprint"]}
+    try:
+        active_conflicts = conflicts(target)
+    except AssetError as exc:
+        return {
+            "status": "updated",
+            "knowledge_ref": raw_asset,
+            "revision": asset["revision"],
+            "previous_fingerprint": current["asset_fingerprint"],
+            "conflicts": [],
+            "conflicts_error": str(exc),
+        }
+    return {
+        "status": "updated",
+        "knowledge_ref": raw_asset,
+        "revision": asset["revision"],
+        "previous_fingerprint": current["asset_fingerprint"],
+        "conflicts": active_conflicts,
+    }
 
 
 def active_assets(target: Path) -> list[tuple[Path, dict[str, Any]]]:
@@ -206,11 +245,17 @@ def active_assets(target: Path) -> list[tuple[Path, dict[str, Any]]]:
     return result
 
 
-def conflicts(target: Path) -> list[dict[str, Any]]:
+def _conflicts_from_assets(
+    assets: Sequence[tuple[Path, dict[str, Any]]],
+    target: Path,
+) -> list[dict[str, Any]]:
     by_id: dict[str, list[dict[str, str]]] = {}
-    for path, asset in active_assets(target):
+    for path, asset in assets:
         for fact in asset["facts"]:
-            by_id.setdefault(fact["id"], []).append({"statement": fact["statement"], "asset_ref": path.relative_to(target).as_posix()})
+            by_id.setdefault(fact["id"], []).append({
+                "statement": fact["statement"],
+                "asset_ref": path.relative_to(target).as_posix(),
+            })
     result: list[dict[str, Any]] = []
     for fact_id, variants in by_id.items():
         if len({item["statement"] for item in variants}) > 1:
@@ -218,20 +263,62 @@ def conflicts(target: Path) -> list[dict[str, Any]]:
     return result
 
 
+def conflicts(target: Path) -> list[dict[str, Any]]:
+    return _conflicts_from_assets(active_assets(target), target)
+
+
+def _fact_source_ok(
+    target: Path, fact: dict[str, Any], cache: dict[str, bool] | None = None
+) -> bool:
+    cache = cache if cache is not None else {}
+    ok = True
+    for ref in fact["source_refs"]:
+        if ref not in cache:
+            try:
+                _source_path(target, ref)
+                cache[ref] = True
+            except AssetError:
+                cache[ref] = False
+        ok = ok and cache[ref]
+    return ok
+
+
 def query(target: Path, tokens: Sequence[str], limit: int, max_chars: int) -> dict[str, Any]:
-    matches: list[dict[str, Any]] = []
-    used = 0
-    for path, asset in active_assets(target):
+    assets = active_assets(target)
+    candidates: list[tuple[int, str, str, dict[str, Any]]] = []
+    for path, asset in assets:
+        ref = path.relative_to(target).as_posix()
         for fact in asset["facts"]:
             haystack = f"{fact['id']} {fact['statement']} {' '.join(asset['key_symbols'])}".casefold()
-            if tokens and not any(token in haystack for token in tokens):
+            matched = [token for token in tokens if token in haystack]
+            if tokens and not matched:
                 continue
-            if len(matches) >= limit or used + len(fact["statement"]) > max_chars:
-                continue
-            ref = path.relative_to(target).as_posix()
-            matches.append({"text": fact["statement"], "ref": ref, "fact_id": fact["id"], "source_refs": fact["source_refs"]})
-            used += len(fact["statement"])
-    return {"facts": matches, "conflicts": conflicts(target)}
+            score = sum(len(token) for token in dict.fromkeys(matched))
+            if tokens and len(set(matched)) == len(set(tokens)):
+                score += 100
+            candidates.append((score, fact["id"], ref, fact))
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    matches: list[dict[str, Any]] = []
+    used = 0
+    omitted = 0
+    source_cache: dict[str, bool] = {}
+    for _, _, ref, fact in candidates:
+        if len(matches) >= limit or used + len(fact["statement"]) > max_chars:
+            omitted += 1
+            continue
+        matches.append({
+            "text": fact["statement"],
+            "ref": ref,
+            "fact_id": fact["id"],
+            "source_refs": fact["source_refs"],
+            "source_ok": _fact_source_ok(target, fact, source_cache),
+        })
+        used += len(fact["statement"])
+    return {
+        "facts": matches,
+        "conflicts": _conflicts_from_assets(assets, target),
+        "omitted": omitted,
+    }
 
 
 def settle(target: Path, raw_asset: str, status: str, replacement: str | None, now: str, markdown_files: Sequence[Path]) -> dict[str, Any]:

@@ -26,6 +26,8 @@ ADR_STATUS_ACTIVE = "有效（现行决策）"
 ADR_STATUS_DEPRECATED = "已废弃"
 ADR_STATUS_SUPERSEDED = "已废弃-被替代"
 ADR_SETTLE_STATUSES = ("deprecated", "superseded")
+ADR_CONSTRAINT_LIMIT = 3
+ADR_CONSTRAINT_MAX_CHARS = 300
 
 ADR_SPEC = AssetSpec(
     kind="adr",
@@ -36,13 +38,19 @@ ADR_SPEC = AssetSpec(
     marker="<!-- docs-harness:adr-document/v1 -->",
     schema=ADR_ASSET_SCHEMA,
     marker_scoped=True,
+    status_labels={
+        "active": ADR_STATUS_ACTIVE,
+        "deprecated": ADR_STATUS_DEPRECATED,
+        "superseded": ADR_STATUS_SUPERSEDED,
+    },
     readme="""# 架构决策记录（ADR）
 
 本目录保存已定稿的架构决策。每项决策由同名 JSON 保存可审计内容，Markdown 提供
 可读投影，并登记到 `docs/INDEX.md`。
 
-ADR 定稿后不再修改（没有 update）；决策失效时用 `adr settle` 废弃或标记被替代，
-资产移入 `archive/`。新决策取代旧决策时通过 `supersedes` 记录取代关系。
+定稿后不得手改 JSON/Markdown；内容修正用 `adr amend`（须 `--reason`），
+失效时用 `adr settle` 废弃或标记被替代，资产移入 `archive/`。
+新决策取代旧决策时通过 `supersedes` 记录取代关系。
 """,
 )
 
@@ -107,16 +115,36 @@ def validate_input(target: Path, value: Any) -> dict[str, Any]:
     }
 
 
+def _validate_revision_history(value: Any) -> None:
+    if not isinstance(value, list):
+        raise AssetError("ADR revision_history 无效", "adr_asset_invalid")
+    for item in value:
+        if not isinstance(item, dict):
+            raise AssetError("ADR revision_history 项无效", "adr_asset_invalid")
+        if not isinstance(item.get("revision"), int) or item["revision"] < 1:
+            raise AssetError("ADR revision_history.revision 无效", "adr_asset_invalid")
+        for key in ("asset_fingerprint", "updated_at"):
+            if not isinstance(item.get(key), str) or not item[key].strip():
+                raise AssetError(f"ADR revision_history 缺少 {key}", "adr_asset_invalid")
+        reason = item.get("amend_reason")
+        if reason is not None and (not isinstance(reason, str) or not reason.strip() or "\n" in reason):
+            raise AssetError("ADR revision_history.amend_reason 无效", "adr_asset_invalid")
+
+
 def validate_asset(value: dict[str, Any]) -> None:
     if value.get("status") not in {"active", "deprecated", "superseded"}:
         raise AssetError("ADR 状态无效", "adr_asset_invalid")
-    if not isinstance(value.get("revision"), int) or value["revision"] != 1:
-        raise AssetError("ADR revision 必须为 1（定稿不可改）", "adr_asset_invalid")
+    if not isinstance(value.get("revision"), int) or value["revision"] < 1:
+        raise AssetError("ADR revision 无效", "adr_asset_invalid")
     for field in ("title", "context", "decision", "consequences"):
         if not isinstance(value.get(field), str) or not value[field].strip():
             raise AssetError(f"ADR {field} 无效", "adr_asset_invalid")
     if not isinstance(value.get("supersedes"), list):
         raise AssetError("ADR supersedes 无效", "adr_asset_invalid")
+    _validate_revision_history(value.get("revision_history", []))
+    last_reason = value.get("last_amend_reason")
+    if last_reason is not None and (not isinstance(last_reason, str) or not last_reason.strip() or "\n" in last_reason):
+        raise AssetError("ADR last_amend_reason 无效", "adr_asset_invalid")
 
 
 def render_markdown(asset: dict[str, Any]) -> str:
@@ -127,12 +155,15 @@ def render_markdown(asset: dict[str, Any]) -> str:
     }[asset["status"]]
     symbols = "、".join(f"`{item}`" for item in asset["key_symbols"])
     replacement = f"\n- 替代资产：`{asset['replacement']}`" if asset.get("replacement") else ""
+    amend_line = ""
+    if asset.get("last_amend_reason") and asset.get("status") == "active":
+        amend_line = f"> 最近修订：{asset['updated_at'][:10]} — {asset['last_amend_reason']}\n"
     supersedes = ""
     if asset["supersedes"]:
         supersedes = "\n\n## 取代\n\n" + "\n".join(f"- `{item}`" for item in asset["supersedes"])
     return (
-        f"> 状态：{status}\n{ADR_SPEC.marker}\n\n# {asset['title']}\n\n"
-        f"- 关键符号：{symbols}\n- 资产指纹：`{asset['asset_fingerprint']}`{replacement}\n\n"
+        f"> 状态：{status}\n{amend_line}{ADR_SPEC.marker}\n\n# {asset['title']}\n\n"
+        f"- 修订：{asset['revision']}\n- 关键符号：{symbols}\n- 资产指纹：`{asset['asset_fingerprint']}`{replacement}\n\n"
         f"## 背景\n\n{asset['context']}\n\n## 决策\n\n{asset['decision']}\n\n"
         f"## 影响\n\n{asset['consequences']}\n{supersedes}"
     )
@@ -148,11 +179,61 @@ def create(target: Path, value: Any, raw_output: str, now: str) -> dict[str, Any
         **content,
         "status": "active",
         "revision": 1,
+        "revision_history": [],
+        "last_amend_reason": None,
         "created_at": now,
         "updated_at": now,
     })
     write_asset(target, ADR_SPEC, output, document, asset, render_markdown(asset), ADR_STATUS_ACTIVE)
     return {"status": "created", "adr_ref": raw_output, "document_ref": raw_output[:-5] + ".md"}
+
+
+def amend(
+    target: Path,
+    raw_asset: str,
+    value: Any,
+    reason: str,
+    now: str,
+) -> dict[str, Any]:
+    if not isinstance(reason, str) or not reason.strip() or "\n" in reason:
+        raise AssetError("adr amend 必须提供单行非空 --reason", "adr_amend_reason_required")
+    reason = reason.strip()
+    source, document, archived = asset_pair(target, raw_asset, ADR_SPEC)
+    if archived:
+        raise AssetError("已归档 ADR 不可 amend", "adr_archived")
+    current = load_asset(source, ADR_SPEC)
+    validate_asset(current)
+    if current["status"] != "active":
+        raise AssetError("仅 active ADR 可 amend", "adr_amend_inactive")
+    content = validate_input(target, value)
+    if content["supersedes"] != current["supersedes"]:
+        raise AssetError("adr amend 不得改变 supersedes", "adr_amend_supersedes_change")
+    history = list(current.get("revision_history", []))
+    history.append({
+        "revision": current["revision"],
+        "asset_fingerprint": current["asset_fingerprint"],
+        "updated_at": current["updated_at"],
+        "amend_reason": reason,
+    })
+    asset = seal_asset({
+        "schema_version": ADR_ASSET_SCHEMA,
+        **content,
+        "status": "active",
+        "revision": current["revision"] + 1,
+        "revision_history": history,
+        "last_amend_reason": reason,
+        "created_at": current["created_at"],
+        "updated_at": now,
+    })
+    write_asset(target, ADR_SPEC, source, document, asset, render_markdown(asset), ADR_STATUS_ACTIVE)
+    return {
+        "status": "amended",
+        "adr_ref": raw_asset,
+        "document_ref": raw_asset[:-5] + ".md",
+        "revision": asset["revision"],
+        "previous_fingerprint": current["asset_fingerprint"],
+        "asset_fingerprint": asset["asset_fingerprint"],
+    }
 
 
 def settle(target: Path, raw_asset: str, status: str, replacement: str | None, now: str, markdown_files: Sequence[Path]) -> dict[str, Any]:
@@ -177,6 +258,35 @@ def settle(target: Path, raw_asset: str, status: str, replacement: str | None, n
     rewritten = rewrite_links(target, ADR_SPEC, source.stem, markdown_files)
     followed = follow_archived_refs(target, ADR_SPEC.root, source.stem)
     return {"status": status, "adr_ref": archived_source.relative_to(target).as_posix(), "document_ref": archived_document.relative_to(target).as_posix(), "rewritten_links": rewritten, "rewritten_source_refs": followed}
+
+
+def active_constraints(target: Path) -> list[dict[str, str]]:
+    """把活跃 ADR 的决策投影成知识查询的 constraints，限制条数与单条长度。"""
+    root = target / ADR_SPEC.root
+    if not root.is_dir() or root.is_symlink():
+        return []
+    constraints: list[dict[str, str]] = []
+    for path in sorted(root.glob("*.json")):
+        try:
+            asset = load_asset(path, ADR_SPEC)
+            validate_asset(asset)
+        except AssetError:
+            continue
+        if asset.get("status") != "active":
+            continue
+        decision = asset.get("decision")
+        if not isinstance(decision, str) or not decision.strip():
+            continue
+        text = f"{asset['title']}：{decision.strip()}"
+        if len(text) > ADR_CONSTRAINT_MAX_CHARS:
+            text = text[: ADR_CONSTRAINT_MAX_CHARS - 1] + "…"
+        constraints.append({
+            "text": text,
+            "ref": path.relative_to(target).as_posix(),
+        })
+        if len(constraints) >= ADR_CONSTRAINT_LIMIT:
+            break
+    return constraints
 
 
 def check(target: Path) -> dict[str, Any]:

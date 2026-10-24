@@ -6,14 +6,17 @@
 本模块不带独立文本渲染器：仓库现有命令无一自带渲染器，新加一个是没有先例的抽象
 （编码质量规范第 10 条"抽象同样要证据"）。
 
-本模块不直接触文件系统，事件读取委托 `usage_log.read_events`。
+事件读取委托 `usage_log.read_events`；收尾报告完整率只读 `.docs-harness/reports/*.md`。
 """
 
 from __future__ import annotations
 
+import datetime as dt
+import re
 from pathlib import Path
 from typing import Any
 
+from report_check import report_fields
 from usage_log import read_events
 
 # 业务默认值单一来源：harness.build_parser 的 --days default 导入本常量。
@@ -28,14 +31,16 @@ _PLAN_SETTLE_STATUSES = ("implemented", "deprecated")
 # pending/failed（harness.acceptance_record: `0 if result["status"] == "passed" else 3`）。
 # 两者都是"记录成功存入"，都计入返工率分母；只认 0 会让分母只数到最后一条翻绿的记录。
 _ACCEPTANCE_RECORD_STORED_CODES = (0, 3)
+_REPORTS_RELATIVE = ".docs-harness/reports"
 
 _LIMITATIONS = (
     "以上均为本地命令调用计数，不代表能力价值，也不代表 agent 对知识的理解质量；"
     "commands 的 errors 只数 HarnessError（result=error），error_codes 为其错误码分布；"
-    "exit_codes 按取值分桶不贴成败标签（3 在 harness 里被多个命令复用，语义各不相同）；"
+    "real_failures 只按退出码 1/2 计数，3 在 harness 里被多个命令复用为待交付或未通过，不能当失败；"
     "checks 只报每个检查命令最近一次调用的 failures/warnings，跨调用加总会把同一条告警重复计数；"
     "资产 create/settle 的成功判定为退出码 0 且非 dry-run；"
     "acceptance record 退出码 3 表示记录已存入但整体验收未通过，计入 acceptance_rework.records 分母；"
+    "report_completeness 按报告文本关键词判断改动/命令/退出码/验证层级/未覆盖五项，可能低估格式不同的报告；"
     "跨仓库汇总需维护者自行在各仓库运行 usage report --json 后合并，harness 不外发任何数据。"
 )
 
@@ -43,10 +48,13 @@ _LIMITATIONS = (
 def build_report(target: Path, days: int) -> dict[str, Any]:
     """窗口内 usage 事件的聚合结果（A-F 六组 + summary + limitations）。"""
     events = read_events(target, days)
+    commands = _command_adoption(events)
     report: dict[str, Any] = {
         "window_days": days,
         "event_count": len(events),
-        "commands": _command_adoption(events),
+        "commands": commands,
+        "adherence": _adherence(events, commands),
+        "report_completeness": _report_completeness(target, days),
         "asset_lifecycle": _asset_lifecycle(events),
         "acceptance_rework": _acceptance_rework(events),
         "plan_settlement": _plan_settlement(events),
@@ -83,6 +91,7 @@ def _command_adoption(events: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "calls": 0, "active_days": 0, "first": None, "last": None,
                 "exit_codes": {}, "errors": 0, "error_codes": {},
+                "real_failures": 0, "warning_runs": 0, "warning_metrics": 0,
             },
         )
         stamp = str(event.get("ts"))
@@ -91,6 +100,12 @@ def _command_adoption(events: list[dict[str, Any]]) -> dict[str, Any]:
         entry["last"] = stamp if entry["last"] is None else max(entry["last"], stamp)
         code = str(event.get("exit_code"))
         entry["exit_codes"][code] = entry["exit_codes"].get(code, 0) + 1
+        if event.get("exit_code") in (1, 2):
+            entry["real_failures"] += 1
+        if isinstance(event.get("warnings"), int):
+            entry["warning_metrics"] += 1
+            if event["warnings"] > 0:
+                entry["warning_runs"] += 1
         if event.get("result") == "error":
             entry["errors"] += 1
             error_code = event.get("error_code")
@@ -99,7 +114,69 @@ def _command_adoption(events: list[dict[str, Any]]) -> dict[str, Any]:
         active.setdefault(label, set()).add(stamp[:10])
     for label, entry in adoption.items():
         entry["active_days"] = len(active[label])
+        entry["real_failure_rate"] = _rate(entry["real_failures"], entry["calls"])
+        entry["warning_rate"] = _rate(entry["warning_runs"], entry["warning_metrics"])
     return adoption
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    return round(numerator / denominator, 3) if denominator else 0.0
+
+
+def _adherence(events: list[dict[str, Any]], commands: dict[str, Any]) -> dict[str, Any]:
+    """遵循率相关信号：真实失败率与检查类调用的 WARN 率。"""
+    real_failures = sum(1 for event in events if event.get("exit_code") in (1, 2))
+    warning_metrics = sum(entry["warning_metrics"] for entry in commands.values())
+    warning_runs = sum(entry["warning_runs"] for entry in commands.values())
+    return {
+        "real_failures": real_failures,
+        "real_failure_rate": _rate(real_failures, len(events)),
+        "check_runs": warning_metrics,
+        "warning_runs": warning_runs,
+        "warning_rate": _rate(warning_runs, warning_metrics),
+    }
+
+
+def _report_date(path: Path) -> dt.date | None:
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", path.name)
+    if match:
+        try:
+            return dt.date.fromisoformat(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _report_completeness(target: Path, days: int) -> dict[str, Any]:
+    """窗口内收尾报告的字段完整率；没有报告目录时返回 0，不视为错误。"""
+    reports_dir = target / _REPORTS_RELATIVE
+    if not reports_dir.is_dir():
+        return {"reports": 0, "complete": 0, "rate": 0.0, "fields": {}}
+    cutoff = dt.date.today() - dt.timedelta(days=days)
+    fields = {"path": 0, "command": 0, "exit": 0, "layer": 0, "uncovered": 0}
+    complete = 0
+    reports = 0
+    for path in sorted(reports_dir.glob("*.md")):
+        if path.name == ".gitignore":
+            continue
+        report_date = _report_date(path)
+        if report_date is not None and report_date < cutoff:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        reports += 1
+        found = report_fields(text)
+        for name, present in found.items():
+            fields[name] += 1 if present else 0
+        complete += 1 if all(found.values()) else 0
+    return {
+        "reports": reports,
+        "complete": complete,
+        "rate": _rate(complete, reports),
+        "fields": fields,
+    }
 
 
 def _asset_lifecycle(events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -187,9 +264,13 @@ def _check_results(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _summary(report: dict[str, Any]) -> str:
     checks = sum(entry["calls"] for entry in report["checks"].values())
+    adherence = report["adherence"]
+    reports = report["report_completeness"]
     return (
         f"usage report {report['window_days']} 天窗口：事件 {report['event_count']} 条、"
         f"命令面 {len(report['commands'])} 个、检查类调用 {checks} 次、"
+        f"真实失败率 {adherence['real_failure_rate']:.1%}、WARN 率 {adherence['warning_rate']:.1%}、"
+        f"收尾报告完整率 {reports['rate']:.1%}、"
         f"acceptance 记录 {report['acceptance_rework']['records']} 条、"
         f"knowledge 查询 {report['knowledge_query']['queries']} 次"
     )

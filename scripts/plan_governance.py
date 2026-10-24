@@ -199,7 +199,22 @@ def governance_from_content(level: str, content: dict[str, Any]) -> dict[str, An
         "updated_knowledge_refs": [],
         "unchanged_reason": None,
         "governance_settled_at": None,
+        "amend_log": [],
     }
+
+
+def _validate_amend_log(entries: Any) -> None:
+    if entries is None:
+        return
+    if not isinstance(entries, list):
+        raise PlanGovernanceError("Plan amend_log 必须是数组", "invalid_plan_ref")
+    for item in entries:
+        if not isinstance(item, dict):
+            raise PlanGovernanceError("Plan amend_log 项必须是对象", "invalid_plan_ref")
+        for key in ("amended_at", "reason", "fingerprint_before", "fingerprint_after"):
+            value = item.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise PlanGovernanceError(f"Plan amend_log 缺少有效 {key}", "invalid_plan_ref")
 
 
 def _validate_governance_state(governance: dict[str, Any]) -> None:
@@ -224,6 +239,7 @@ def _validate_governance_state(governance: dict[str, Any]) -> None:
             raise PlanGovernanceError("unchanged 治理不得登记 Knowledge 引用", "invalid_plan_ref")
     elif refs or reason is not None:
         raise PlanGovernanceError("未结算 unchanged 治理状态无效", "invalid_plan_ref")
+    _validate_amend_log(governance.get("amend_log"))
 
 
 def validate_plan(value: Any) -> dict[str, Any]:
@@ -231,6 +247,10 @@ def validate_plan(value: Any) -> dict[str, Any]:
         raise PlanGovernanceError("方案冻结合同无效", "invalid_plan_ref")
     if value.get("plan_fingerprint") != plan_fingerprint(value):
         raise PlanGovernanceError("方案冻结合同指纹无效", "invalid_plan_ref")
+    last_amended = value.get("last_amended_at")
+    if last_amended is not None and not isinstance(last_amended, str):
+        raise PlanGovernanceError("Plan last_amended_at 无效", "invalid_plan_ref")
+    _validate_amend_log(value.get("amend_log"))
     if value["schema_version"] == PLAN_SCHEMA_V2:
         return value
     refs = value.get("acceptance_refs")
@@ -260,6 +280,19 @@ def new_plan_fields(level: str, content: dict[str, Any]) -> dict[str, Any]:
     if governance is not None:
         fields["governance"] = governance
     return fields
+
+
+def plan_amend_notice_line(frozen: dict[str, Any]) -> str:
+    governance = frozen.get("governance")
+    log: list[Any] = []
+    if isinstance(governance, dict):
+        log = list(governance.get("amend_log") or [])
+    if not log:
+        log = list(frozen.get("amend_log") or [])
+    if not log:
+        return ""
+    last = log[-1]
+    return f"> 最近修订：{last['amended_at'][:10]} — {last['reason']}\n"
 
 
 def render_governance_block(frozen: dict[str, Any]) -> str:
@@ -356,6 +389,81 @@ def remove_acceptance_ref(
     )
 
 
+def _seal_amend_log_fixed_point(sealed: dict[str, Any]) -> dict[str, Any]:
+    for _ in range(8):
+        fingerprint = sealed["plan_fingerprint"]
+        if isinstance(sealed.get("governance"), dict):
+            gov = dict(sealed["governance"])
+            log = list(gov["amend_log"])
+            log[-1] = {**log[-1], "fingerprint_after": fingerprint}
+            candidate = seal_plan({**sealed, "governance": {**gov, "amend_log": log}})
+        elif isinstance(sealed.get("amend_log"), list) and sealed["amend_log"]:
+            log = list(sealed["amend_log"])
+            log[-1] = {**log[-1], "fingerprint_after": fingerprint}
+            candidate = seal_plan({**sealed, "amend_log": log})
+        else:
+            break
+        if candidate["plan_fingerprint"] == fingerprint:
+            return candidate
+        sealed = candidate
+    return sealed
+
+
+def _amended_governance(
+    frozen: dict[str, Any], content: dict[str, Any]
+) -> dict[str, Any] | None:
+    """校验并返回修订后的 governance；允许改治理声明，但清空旧结算输入。
+
+    目标与验收语义仍可通过 amend 修正；只有把方案标记为已实施/废弃才走 settle。
+    """
+    governance = frozen.get("governance")
+    if isinstance(governance, dict) and governance.get("governance_settled_at"):
+        raise PlanGovernanceError("已 settle 的方案不可 amend", "plan_amend_settled")
+    expected = governance_from_content(frozen.get("plan_level", ""), content)
+    if expected is None:
+        if governance is not None:
+            raise PlanGovernanceError("非 Full Plan 不得包含 governance", "invalid_plan_ref")
+        return None
+    if not isinstance(governance, dict):
+        raise PlanGovernanceError("Full Plan 缺少 governance", "invalid_plan_ref")
+    amended = dict(governance)
+    amended["acceptance_required"] = expected["acceptance_required"]
+    amended["knowledge_impact"] = expected["knowledge_impact"]
+    # 治理声明变了，旧结算输入不再有效；settle 时会重新要求。
+    amended["updated_knowledge_refs"] = []
+    amended["unchanged_reason"] = None
+    return amended
+
+
+def apply_plan_amend(
+    frozen: dict[str, Any],
+    content: dict[str, Any],
+    reason: str,
+    now: str,
+) -> dict[str, Any]:
+    """受控修订活方案 content；重算 plan_fingerprint 并追加 amend_log。"""
+    reason = _single_line(reason, "amend reason")
+    governance = _amended_governance(frozen, content)
+    fingerprint_before = frozen["plan_fingerprint"]
+    entry = {
+        "amended_at": now,
+        "reason": reason,
+        "fingerprint_before": fingerprint_before,
+        "fingerprint_after": "",
+    }
+    updated = dict(frozen)
+    updated["content"] = content
+    updated["last_amended_at"] = now
+    if governance is not None:
+        governance["amend_log"] = list(governance.get("amend_log") or []) + [entry]
+        updated["governance"] = governance
+    else:
+        updated["amend_log"] = list(updated.get("amend_log") or []) + [entry]
+    sealed = _seal_amend_log_fixed_point(seal_plan(updated))
+    validate_plan(sealed)
+    return sealed
+
+
 def _load_linked_asset(target: Path, raw: str, schema: str) -> dict[str, Any]:
     relative = Path(raw)
     if relative.is_absolute() or ".." in relative.parts:
@@ -396,6 +504,13 @@ def prepare_settlement(
         if not terminal:
             raise PlanGovernanceError(
                 "该方案声明需要 Acceptance，但没有已结项验收。下一步：先执行 acceptance create/record/settle，再重跑 plan settle"
+            )
+        if not any(item.get("status") in {"passed", "failed"} for item in terminal):
+            raise PlanGovernanceError(
+                "该方案的关联验收只有 deprecated/superseded，不能证明已实施。"
+                "下一步：若工作已迁出本仓库，请把 Plan 也 settle --status deprecated；"
+                "否则完成 acceptance record/settle --status passed|failed 后重跑",
+                "acceptance_required_not_satisfied",
             )
         if any(item.get("status") == "failed" for item in terminal):
             warnings.append("WARN: 关联 Acceptance 以 failed 结项，收尾报告必须说明失败结果")

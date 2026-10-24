@@ -17,9 +17,18 @@ INDEX_SCAFFOLD = "# 项目文档索引\n\n项目文档从这里进入；Docs Har
 
 
 class AssetError(Exception):
-    def __init__(self, message: str, code: str = "asset_invalid") -> None:
+    def __init__(
+        self,
+        message: str,
+        code: str = "asset_invalid",
+        *,
+        details: dict[str, Any] | None = None,
+        next_action: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.details = details
+        self.next_action = next_action
 
 
 @dataclass(frozen=True)
@@ -35,6 +44,8 @@ class AssetSpec:
     # True 时只治理带 projection marker 的 Markdown（目录可能与用户既有文档共存，
     # 如 docs/adr/）；False 时目录内全部 JSON/MD 都必须成对（Harness 专有目录）。
     marker_scoped: bool = False
+    # JSON status -> Markdown/INDEX 展示文案；提供时 check 会校验投影是否漂移。
+    status_labels: dict[str, str] | None = None
 
     @property
     def archive(self) -> str:
@@ -299,7 +310,7 @@ def check_assets(target: Path, spec: AssetSpec, validate: Callable[[dict[str, An
                 continue
             checked += 1
             _check_asset_pair(
-                target, spec, validate, lines, path, document, archived, failures
+                target, spec, validate, lines, path, document, archived, failures, warnings
             )
     relative_root = spec.root.split("/", 1)[1]
     for line in lines:
@@ -319,6 +330,22 @@ def check_assets(target: Path, spec: AssetSpec, validate: Callable[[dict[str, An
     }
 
 
+def _normalize_projected_status(text: str) -> str:
+    """比较状态时忽略括号内的核对备注与 INDEX 截断的右括号。
+
+    例：「有效（现行决策；2026-10-22 核对：…）」与「有效（现行决策）」
+    视为同一状态；「有效（现行决策」也补齐右括号后比较。
+    """
+    value = text.strip()
+    for separator in ("；", ";"):
+        if separator in value:
+            value = value.split(separator, 1)[0].strip()
+            break
+    if value.count("（") > value.count("）"):
+        value += "）"
+    return value
+
+
 def _check_asset_pair(
     target: Path,
     spec: AssetSpec,
@@ -328,6 +355,7 @@ def _check_asset_pair(
     document: Path,
     archived: bool,
     failures: list[str],
+    warnings: list[str],
 ) -> None:
     try:
         asset = load_asset(path, spec)
@@ -335,10 +363,36 @@ def _check_asset_pair(
     except AssetError as exc:
         failures.append(f"{path.relative_to(target)}: {exc}")
         return
-    if spec.marker not in document.read_text(encoding="utf-8").splitlines()[:3]:
+    try:
+        document_text = document.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        failures.append(f"{document.relative_to(target)}: 无法读取 Markdown 投影：{exc}")
+        return
+    head = document_text.splitlines()[:3]
+    if spec.marker not in head:
         failures.append(f"{document.relative_to(target)}: Markdown 投影标记无效")
-    indexed = any(document.name in line for line in index_lines)
+    indexed_line = next((line for line in index_lines if document.name in line), "")
+    indexed = bool(indexed_line)
     if archived and indexed:
         failures.append(f"docs/INDEX.md: 归档资产 {document.name} 仍在活索引")
     if not archived and not indexed:
         failures.append(f"docs/INDEX.md: 缺少 {document.name} 条目")
+    expected_status = (spec.status_labels or {}).get(asset.get("status"))
+    if expected_status:
+        banner_line = next((line for line in head if "状态：" in line), "")
+        actual_status = (
+            banner_line.split("状态：", 1)[1].split("｜", 1)[0].strip()
+            if "状态：" in banner_line else ""
+        )
+        if _normalize_projected_status(actual_status) != _normalize_projected_status(expected_status):
+            warnings.append(
+                f"{document.relative_to(target)}: Markdown 状态「{actual_status}」"
+                f"与 JSON「{expected_status}」不一致"
+            )
+        if not archived and indexed_line and "状态：" in indexed_line:
+            index_status = indexed_line.split("状态：", 1)[1].split("；", 1)[0].strip()
+            if _normalize_projected_status(index_status) != _normalize_projected_status(expected_status):
+                warnings.append(
+                    f"docs/INDEX.md: {document.name} 状态「{index_status}」"
+                    f"与 JSON「{expected_status}」不一致"
+                )
