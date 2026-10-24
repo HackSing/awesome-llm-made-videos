@@ -16,7 +16,7 @@ FIELD_LABELS = {
 }
 _PATH = re.compile(r"`[^`\n]*[./\\][^`\n]*`|(?:^|\s)(?:[\w.-]+/)+[\w.-]+\.[A-Za-z0-9]+")
 _COMMAND = re.compile(
-    r"(?m)(?:^|[\s`])(?:python|pytest|npm|pnpm|yarn|cargo|go test|dotnet|gradle|mvn|make|bash|node|flutter|dart|git)\b"
+    r"(?m)(?:^|[\s`])(?:python[0-9]*(?:\.[0-9]+)*|pytest|npm|pnpm|yarn|cargo|go test|dotnet|gradle|mvn|make|bash|node|flutter|dart|git)\b"
 )
 _EXIT = re.compile(
     r"退出(?:码|状态)?\s*[:：]?\s*\d|exit[_ ]?code|exit\s*[:=]\s*\d|EXIT=|返回码",
