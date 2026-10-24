@@ -10,7 +10,12 @@ gaps, and stops at the first risk-control response instead of retrying.
 
 Usage:
   python3 scripts/bilibili.py                  # full run from scripts/queries.json
+  python3 scripts/bilibili.py --since 2026-09-22   # incremental: one UTC day at a time
   python3 scripts/bilibili.py --max-queries 1 --max-pages 1 --max-views 3   # smoke test
+
+A broad query gets ~150 new videos a day, so the configured page caps (newest 200,
+top 100 by plays) only reach back a day or two. --since searches each UTC day
+separately and pages to the end, so no day is skipped.
 """
 
 import argparse
@@ -22,6 +27,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 from _common import (
     CANDIDATES,
@@ -38,6 +44,7 @@ from _common import (
     models_mentioned,
     new_run_id,
     parse_iso,
+    read_csv,
     slug,
     utc_now,
     write_csv,
@@ -53,6 +60,12 @@ VIEW = "https://api.bilibili.com/x/web-interface/view"
 # -412 request blocked, -352 risk-control check, -799 too frequent, -509 overload
 RISK_CODES = {-412, -352, -799, -509}
 TAG_RE = re.compile(r"<[^>]+>")
+# search/type serves at most 50 pages of 20 (numResults tops out at 1000)
+API_MAX_PAGES = 50
+API_MAX_RESULTS = 1000
+# Fields only the detail endpoint fills in; incremental runs keep them for known videos
+DETAIL_FIELDS = ("platform_copyright", "duration_s", "uploader", "uploader_id", "desc_links")
+BILI_RECEIPT_FIELDS = RECEIPT_FIELDS + ["pubtime_day"]
 
 
 class RiskControl(Exception):
@@ -114,7 +127,7 @@ def save_raw(run_dir, name, data):
     path.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
 
 
-def receipt(endpoint, query, order, page, status, code="", returned="", num_results=""):
+def receipt(endpoint, query, order, page, status, code="", returned="", num_results="", day=""):
     return {
         "captured_utc": iso(utc_now()),
         "endpoint": endpoint,
@@ -125,7 +138,27 @@ def receipt(endpoint, query, order, page, status, code="", returned="", num_resu
         "code": code,
         "returned": returned,
         "num_results": num_results,
+        "pubtime_day": day,
     }
+
+
+def search_plans(queries, orders, since):
+    """(query, order, max_pages, extra params, UTC day) for every search to page through.
+
+    Without `since`: each query in each configured order, up to its page cap.
+    With `since`: each query once per UTC day, newest day first, newest posts first,
+    to the last page, so a stop on risk control still leaves the latest days whole.
+    """
+    if not since:
+        return [(q, order, pages, {}, "") for q in queries for order, pages in orders.items()]
+    first = datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    days = [first + timedelta(days=n) for n in range((utc_now() - first).days + 1)]
+    plans = []
+    for day in reversed(days):
+        begin = int(day.timestamp())
+        window = {"pubtime_begin_s": begin, "pubtime_end_s": begin + 86400 - 1}
+        plans += [(q, "pubdate", API_MAX_PAGES, window, day.strftime("%Y-%m-%d")) for q in queries]
+    return plans
 
 
 def main():
@@ -135,6 +168,8 @@ def main():
     ap.add_argument("--max-pages", type=int, help="cap pages per query/order")
     ap.add_argument("--max-views", type=int, help="cap detail lookups (default: all relevant)")
     ap.add_argument("--no-view", action="store_true", help="skip detail lookups")
+    ap.add_argument("--since", help="UTC date YYYY-MM-DD: search day by day from here to today; "
+                    "detail lookups only for videos not yet in the candidates")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -148,49 +183,49 @@ def main():
     receipts = []
     hits = {}  # bvid -> search result
     matched = {}  # bvid -> {"query|order"}
+    saturated = []  # "query|day" slices that hit the API's result ceiling
     stopped = None
 
     client = Client(Pacer(2.0, 5.0))
     client.bootstrap()
 
     # 1. Search
-    for q in queries:
+    for q, order, max_pages, window, day in search_plans(queries, orders, args.since):
         if stopped:
             break
-        for order, max_pages in orders.items():
-            if stopped:
+        if args.max_pages:
+            max_pages = min(max_pages, args.max_pages)
+        for page in range(1, max_pages + 1):
+            params = {"search_type": "video", "keyword": q, "order": order, "page": page, **window}
+            referer = "https://search.bilibili.com/all?keyword=" + urllib.parse.quote(q)
+            try:
+                d = client.api(SEARCH, params, referer)
+            except RiskControl as e:
+                receipts.append(receipt("search", q, order, page, "risk_control", e.args[0], day=day))
+                stopped = f"search risk control {e.args}"
                 break
-            if args.max_pages:
-                max_pages = min(max_pages, args.max_pages)
-            for page in range(1, max_pages + 1):
-                params = {"search_type": "video", "keyword": q, "order": order, "page": page}
-                referer = "https://search.bilibili.com/all?keyword=" + urllib.parse.quote(q)
-                try:
-                    d = client.api(SEARCH, params, referer)
-                except RiskControl as e:
-                    receipts.append(receipt("search", q, order, page, "risk_control", e.args[0]))
-                    stopped = f"search risk control {e.args}"
-                    break
-                except Exception as e:  # network or parse failure: record and move on
-                    receipts.append(receipt("search", q, order, page, f"error:{type(e).__name__}"))
-                    break
-                save_raw(run_dir, f"search/{slug(q)}__{order}__p{page}.json", d)
-                data = d.get("data") or {}
-                results = data.get("result") or []
-                receipts.append(
-                    receipt("search", q, order, page, "ok" if d.get("code") == 0 else "api_error",
-                            d.get("code"), len(results), data.get("numResults", ""))
-                )
-                for r in results:
-                    bvid = r.get("bvid")
-                    if not bvid:
-                        continue
-                    hits.setdefault(bvid, r)
-                    matched.setdefault(bvid, set()).add(f"{q}|{order}")
-                if not results or page >= (data.get("numPages") or 0):
-                    break
-                if order == "pubdate" and all(int(r.get("pubdate", 0)) < window_start.timestamp() for r in results):
-                    break
+            except Exception as e:  # network or parse failure: record and move on
+                receipts.append(receipt("search", q, order, page, f"error:{type(e).__name__}", day=day))
+                break
+            save_raw(run_dir, f"search/{slug(q)}__{order}{'__' + day if day else ''}__p{page}.json", d)
+            data = d.get("data") or {}
+            results = data.get("result") or []
+            receipts.append(
+                receipt("search", q, order, page, "ok" if d.get("code") == 0 else "api_error",
+                        d.get("code"), len(results), data.get("numResults", ""), day=day)
+            )
+            if day and page == 1 and int(data.get("numResults") or 0) >= API_MAX_RESULTS:
+                saturated.append(f"{q}|{day}")
+            for r in results:
+                bvid = r.get("bvid")
+                if not bvid:
+                    continue
+                hits.setdefault(bvid, r)
+                matched.setdefault(bvid, set()).add(f"{q}|{order}")
+            if not results or page >= (data.get("numPages") or 0):
+                break
+            if order == "pubdate" and all(int(r.get("pubdate", 0)) < window_start.timestamp() for r in results):
+                break
 
     # 2. Keep posts that name a tracked model and were published inside the window
     now = iso(utc_now())
@@ -230,10 +265,17 @@ def main():
             "notes": "",
         }
 
+    # Incremental runs look up details only for new videos; known ones keep theirs
+    known = {}
+    if args.since:
+        known = {r["platform_id"]: r for r in read_csv(CANDIDATES / "bilibili.csv")}
+        for bvid in rows.keys() & known.keys():
+            rows[bvid].update({k: known[bvid][k] for k in DETAIL_FIELDS})
+
     # 3. Detail lookups: copyright flag, full description links, exact duration
     views_done = 0
     if not args.no_view and not stopped:
-        order_by_views = sorted(rows, key=lambda b: int(rows[b]["views"] or 0), reverse=True)
+        order_by_views = sorted(rows.keys() - known.keys(), key=lambda b: int(rows[b]["views"] or 0), reverse=True)
         for bvid in order_by_views[: args.max_views]:
             try:
                 d = client.api(VIEW, {"bvid": bvid}, f"https://www.bilibili.com/video/{bvid}")
@@ -264,11 +306,14 @@ def main():
 
     # 4. Write outputs
     RECEIPTS.mkdir(parents=True, exist_ok=True)
-    write_csv(RECEIPTS / f"bilibili-{run}.csv", receipts, RECEIPT_FIELDS)
+    write_csv(RECEIPTS / f"bilibili-{run}.csv", receipts, BILI_RECEIPT_FIELDS)
     merged = merge_candidates(CANDIDATES / "bilibili.csv", list(rows.values()))
     summary = {
         "run": run,
         "launch": cfg["launch"],
+        "since": args.since,
+        "saturated_day_slices": saturated,
+        "known_videos_kept_details": len(rows.keys() & known.keys()),
         "queries": len(queries),
         "search_calls": sum(1 for r in receipts if r["endpoint"] == "search"),
         "search_ok": sum(1 for r in receipts if r["endpoint"] == "search" and r["status"] == "ok"),

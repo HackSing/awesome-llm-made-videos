@@ -20,11 +20,19 @@ import glob
 import json
 import re
 
-from _common import CANDIDATES, RAW, read_csv
+from _common import CANDIDATES, DATA, RAW, read_csv
 from import_seed_athemeroy import fetch_csv, status_parts
 
 TRIAGE = RAW / "triage"
+LABELS = DATA / "triage"
 TAG_RE = re.compile(r"<[^>]+>")
+
+
+def first_free_chunk(platform):
+    """Number after the last committed labels file, so a new batch never overwrites old labels."""
+    pattern = re.compile(rf"{re.escape(platform)}_(\d+)\.labels\.jsonl")
+    used = [int(m.group(1)) for p in LABELS.glob(f"{platform}_*.labels.jsonl") if (m := pattern.fullmatch(p.name))]
+    return max(used, default=0) + 1
 
 
 def bilibili_desc():
@@ -93,8 +101,9 @@ def main():
     TRIAGE.mkdir(parents=True, exist_ok=True)
     for platform in args.platforms:
         rows = rows_for(platform)
+        first = first_free_chunk(platform)
         for i in range(0, len(rows), args.chunk):
-            path = TRIAGE / f"{platform}_{i // args.chunk + 1:02d}.jsonl"
+            path = TRIAGE / f"{platform}_{first + i // args.chunk:02d}.jsonl"
             with path.open("w", encoding="utf-8") as f:
                 for row in rows[i : i + args.chunk]:
                     f.write(json.dumps(row, ensure_ascii=False) + "\n")

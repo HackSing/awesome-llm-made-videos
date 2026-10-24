@@ -7,7 +7,7 @@
 *Videos made **with** LLMs, tracked across platforms: who made them, who reposted them, and how the pixels were produced.*
 
 <!-- snapshot:summary -->
-> **快照 2026-09-27**：候选帖子 2,062 条（B站 815，X 1,246，YouTube 1；其中 X 的 1,081 条来自 athemeroy 仓库，他们人工审过的案例已转成本项目的标签，其余 928 条本项目没有筛选）。已筛选 1,134 条，确认为大模型参与制作的作品 683 件，在各平台共出现 699 次，其中上传者自己声明是转载的 33 次，筛选判为疑似转载、尚未找到原作的 22 次。初筛只看文字；206 件作品有人看过抽帧（athemeroy 审核或本项目复核），其余结论有待人工复核。
+> **快照 2026-09-27**：候选帖子 2,065 条（B站 815，X 1,249，YouTube 1；其中 X 的 1,081 条来自 athemeroy 仓库，他们人工审过的案例已转成本项目的标签，其余 927 条本项目没有筛选）。已筛选 1,138 条，确认为大模型参与制作的作品 686 件，在各平台共出现 702 次，其中上传者自己声明是转载的 33 次，筛选判为疑似转载、尚未找到原作的 22 次。初筛只看文字；206 件作品有人看过抽帧（athemeroy 审核或本项目复核），其余结论有待人工复核。
 <!-- /snapshot:summary -->
 
 ## 章节
@@ -21,7 +21,7 @@
 每个类别取证据等级最高、播放量最高的 5 件。完整列表见各章节和 [`data/works.csv`](data/works.csv)。
 
 <!-- works:start -->
-### 代码绘制的 2D 动画（142）
+### 代码绘制的 2D 动画（143）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
@@ -31,9 +31,9 @@
 | Astra图像分层2D动画 | wu_tian吴天 | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV195bu6REvm) | A* |
 | 月行水上前端动画复刻 | Ulchemist | GPT-6 Astra | [B站](https://www.bilibili.com/video/BV14aYL6GEbx) | A* |
 
-其余 137 件见 [`data/works.csv`](data/works.csv)。
+其余 138 件见 [`data/works.csv`](data/works.csv)。
 
-### 教学讲解（49）
+### 教学讲解（50）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
@@ -43,7 +43,7 @@
 | 西方文明片的中国版 | @xxxjzuo | Opus 5.5 | [X](https://x.com/xxxjzuo/status/2103872071256445330) | B |
 | 星舰科普视频 | 风之谷AI | Opus 5.5 | [B站](https://www.bilibili.com/video/BV1VxhD6jE5V) | B |
 
-其余 44 件见 [`data/works.csv`](data/works.csv)。
+其余 45 件见 [`data/works.csv`](data/works.csv)。
 
 ### 3D 与实时图形（121）
 
@@ -93,7 +93,7 @@
 
 其余 79 件见 [`data/works.csv`](data/works.csv)。
 
-### 混合或未说明（215）
+### 混合或未说明（216）
 
 | 作品 | 作者 | 模型 | 出现 | 证据 |
 |---|---|---|---|:-:|
@@ -103,7 +103,7 @@
 | Grok舞蹈素材动态图形短片 | @AbaneChan | Opus 5.5 | [X](https://x.com/AbaneChan/status/2103903213363806575) | B |
 | AE骨骼驱动歌词舞蹈MV | @aicreataro | Opus 5.5 | [X](https://x.com/aicreataro/status/2103757144789221819) | B |
 
-其余 210 件见 [`data/works.csv`](data/works.csv)。
+其余 211 件见 [`data/works.csv`](data/works.csv)。
 <!-- works:end -->
 
 ## 收什么，不收什么
@@ -137,6 +137,7 @@
 
 ```bash
 python3 scripts/bilibili.py                 # 采集 B 站
+python3 scripts/bilibili.py --since 2026-09-22   # 按天补采：从指定日期到今天，每天翻到最后一页
 python3 scripts/prepare_triage.py bilibili  # 切分待筛选候选
 # 按 scripts/triage/PROMPT.md 生成 data/triage/*.labels.jsonl
 # 按 scripts/review/REVIEW.md 复核，生成 data/review/*.jsonl

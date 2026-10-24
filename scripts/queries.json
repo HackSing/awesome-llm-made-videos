@@ -58,7 +58,7 @@
     ]
   },
   "x": {
-    "note": "Browser-only, maintainer's session. Per session <=15 queries, per day <=40; 40-120 s between queries. Opus 5.5 coverage up to 2026-09-25 15:21 UTC comes from the athemeroy seed. Latest/live mode was tried once and dropped: at a human scroll pace it only reaches the last few minutes of posts, so date-windowed Top queries are used instead.",
+    "note": "Browser-only, maintainer's session. Per session <=15 queries, per day <=40; 40-120 s between queries. Opus 5.5 coverage up to 2026-09-25 15:21 UTC comes from the athemeroy seed. Latest/live mode was tried once and dropped: at a human scroll pace it only reaches the last few minutes of posts, so date-windowed Top queries are used instead. From 2026-10-03 on, runs use a maintainer's secondary account in Claude's built-in browser, and Opus 5.5 is searched one UTC day per query (since:D until:D+1).",
     "screens": 10,
     "queries": [
       [
@@ -119,6 +119,66 @@
       ],
       [
         "\"GPT-6\" video filter:videos",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-26 until:2026-09-27",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-27 until:2026-09-28",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-28 until:2026-09-29",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-29 until:2026-09-30",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-09-30 until:2026-10-01",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-10-01 until:2026-10-02",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-10-02 until:2026-10-03",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" filter:videos since:2026-10-03",
+        "top"
+      ],
+      [
+        "\"GPT-6 Sol\" filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"GPT-6 Luna\" filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"GPT-6 Astra\" filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"GPT-6\" animation filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" 动画 filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" アニメ filter:videos since:2026-09-26",
+        "top"
+      ],
+      [
+        "\"Opus 5.5\" animation filter:videos since:2026-09-26",
         "top"
       ]
     ]
