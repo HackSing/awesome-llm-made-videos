@@ -21,6 +21,7 @@ from plan_governance import (
 AssetChecker = Callable[[Path], dict[str, Any]]
 PlanChecker = Callable[[Path, bool], dict[str, Any]]
 ASSET_STALE_DAYS = 90
+PLAN_AMEND_GRACE_DAYS = 30
 WARNING_PREVIEW_LIMIT = 5
 
 
@@ -131,6 +132,32 @@ def _plan_amend_log(plan: dict[str, Any], governance: Any) -> list[Any] | None:
     return plan.get("amend_log")
 
 
+def plan_amend_recently(value: Any, now: dt.datetime) -> bool:
+    """修订次数达到提示阈值，但最近一次修订仍在宽限期内。
+
+    同一轮定案常连续 amend 多次；修订当天就提示 settle 只会制造噪音。
+    超过宽限期仍按原规则提示，避免长期未决方案逃逸。
+    """
+    if not isinstance(value, dict):
+        return False
+    raw = value.get("last_amended_at")
+    if not isinstance(raw, str):
+        log = value.get("amend_log")
+        if isinstance(log, list) and log and isinstance(log[-1], dict):
+            raw = log[-1].get("amended_at")
+    if not isinstance(raw, str):
+        return False
+    try:
+        moment = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=dt.timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=dt.timezone.utc)
+    return dt.timedelta(0) <= (now - moment) <= dt.timedelta(days=PLAN_AMEND_GRACE_DAYS)
+
+
 def _plan_amend_warning(
     plan: dict[str, Any], governance: Any, plan_ref: str
 ) -> str | None:
@@ -138,6 +165,9 @@ def _plan_amend_warning(
     if not isinstance(log, list) or len(log) < 3:
         return None
     if isinstance(governance, dict) and governance.get("governance_settled_at"):
+        return None
+    reviewed = governance if isinstance(governance, dict) else plan
+    if plan_amend_recently(reviewed, dt.datetime.now(dt.timezone.utc)):
         return None
     return (
         f"WARN: {plan_ref}: amend 已达 {len(log)} 次，"

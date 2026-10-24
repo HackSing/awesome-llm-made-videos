@@ -29,6 +29,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from codemap_check import parse_codemap, parse_codemap_index_entries
 from symbol_check import symbol_hit
 
 FILE_RED_LINE = 600
@@ -55,7 +56,6 @@ TS_PARSER_UNAVAILABLE_WARNING = (
 TS_STRICT_SUFFIXES = frozenset({".ts", ".tsx"})
 # 接收者形如 (a *App)、(App)、(s *Store[T])：可选变量名 + 可选 * + 类型名，类型参数忽略。
 _GO_FUNC_PATTERN = re.compile(r"^func\s+(?:\(\s*(?:\w+\s+)?\*?\s*(\w+)[^)]*\)\s*)?(\w+)")
-_CODEMAP_ENTRY_PATTERN = re.compile(r"^\s*-\s*`([^`]+)`")
 
 CODEMAP_SCAFFOLD = """# CODEMAP：代码能力索引
 
@@ -360,23 +360,35 @@ def _collect_function_spans(
     return result, ts_reason
 
 
-def parse_codemap(text: str) -> list[tuple[str, list[str]]]:
-    """解析 CODEMAP 条目行：`- `路径` — 职责：…；公开接口：`sym`…`；不匹配的行忽略。"""
-    entries: list[tuple[str, list[str]]] = []
-    for line in text.splitlines():
-        match = _CODEMAP_ENTRY_PATTERN.match(line)
-        if not match:
-            continue
-        _, _, interface_part = line.partition("公开接口")
-        symbols = re.findall(r"`([^`]+)`", interface_part)
-        entries.append((match.group(1), symbols))
-    return entries
+_CODEMAP_DIR_SUFFIXES = frozenset({
+    ".go", ".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs", ".py",
+    ".sh", ".ps1", ".json",
+})
+
+
+def _codemap_dir_contents(path: Path) -> list[tuple[Path, str]]:
+    return [
+        (child, child.read_text(encoding="utf-8", errors="replace"))
+        for child in sorted(path.iterdir())
+        if child.is_file()
+        and child.suffix.lower() in _CODEMAP_DIR_SUFFIXES
+        and not _is_test_file(child.name)
+    ]
 
 
 def _codemap_consistency_warnings(target: Path, entries: list[tuple[str, list[str]]]) -> list[str]:
     warnings: list[str] = []
     for module_path, symbols in entries:
         path = target / module_path
+        if path.is_dir():
+            contents = _codemap_dir_contents(path)
+            for symbol in symbols:
+                if not any(symbol_hit(content, symbol, child.suffix) for child, content in contents):
+                    warnings.append(
+                        f"CODEMAP 中 {module_path} 的公开接口 `{symbol}` "
+                        "在源码中不存在，索引已失活，同步更新条目"
+                    )
+            continue
         if not path.is_file():
             warnings.append(
                 f"CODEMAP 登记的模块不存在：{module_path}，更新或移除该条目"
@@ -450,8 +462,11 @@ def check_structure(
     checked = len(changed)
     codemap_path = target / CODEMAP_RELATIVE
     if codemap_path.is_file():
-        entries = parse_codemap(codemap_path.read_text(encoding="utf-8", errors="replace"))
-        warnings.extend(_codemap_consistency_warnings(target, entries))
+        codemap_text = codemap_path.read_text(encoding="utf-8", errors="replace")
+        entries = parse_codemap(codemap_text)
+        warnings.extend(
+            _codemap_consistency_warnings(target, parse_codemap_index_entries(codemap_text))
+        )
         warnings.extend(_codemap_registration_warnings(changed, entries))
         checked += len(entries)
     payload: dict[str, Any] = {"status": "passed", "failures": [], "warnings": warnings, "checked": checked}
@@ -500,11 +515,12 @@ def structure_report(
             if span > FUNC_RED_LINE:
                 oversized_functions.append({"path": relative, "function": name, "lines": span})
     codemap_path = target / CODEMAP_RELATIVE
-    entries = (
-        parse_codemap(codemap_path.read_text(encoding="utf-8", errors="replace"))
+    codemap_text = (
+        codemap_path.read_text(encoding="utf-8", errors="replace")
         if codemap_path.is_file()
-        else []
+        else ""
     )
+    entries = parse_codemap(codemap_text)
     registered = {module_path for module_path, _ in entries}
     unregistered = [
         relative for relative in files
@@ -521,7 +537,9 @@ def structure_report(
         "codemap": {
             "present": codemap_path.is_file(),
             "entries": len(entries),
-            "dead_entry_warnings": _codemap_consistency_warnings(target, entries),
+            "dead_entry_warnings": _codemap_consistency_warnings(
+                target, parse_codemap_index_entries(codemap_text)
+            ),
             "unregistered_files": unregistered,
         },
         "summary": (

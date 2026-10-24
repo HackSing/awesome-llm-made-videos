@@ -58,6 +58,26 @@ def plan_check_banner(path: Path) -> str | None:
     return None
 
 
+def canonical_index_entry(entries: list[str], basename: str) -> str:
+    """返回方案的正式 INDEX 条目行。
+
+    优先行首 Markdown 链接，其次行首表格路径；都没有时才回退首次提及。
+    引用句与跨方案链接出现在正式条目之前时不得被当成方案条目。
+    """
+    if not entries:
+        return ""
+    escaped = re.escape(basename)
+    bullet = re.compile(r"^- \[[^\]]*\]\(plans/" + escaped + r"\)")
+    table = re.compile(r"^\|\s*`plans/" + escaped + r"`")
+    for entry in entries:
+        if bullet.match(entry):
+            return entry
+    for entry in entries:
+        if table.match(entry):
+            return entry
+    return entries[0]
+
+
 def partial_delivery_checked_recently(banner: str, today: dt.date) -> bool:
     """横幅为「有效-部分交付（YYYY-MM-DD 核对）」且核对日在时效内时返回 True。
 

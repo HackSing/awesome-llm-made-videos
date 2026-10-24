@@ -105,6 +105,7 @@ from plan_check import (
     PLAN_CHECK_SYMBOL_MAX_FILE_BYTES,
     PLAN_PARTIAL_DELIVERY_BANNER,
     PLAN_PARTIAL_DELIVERY_RECHECK_DAYS,
+    canonical_index_entry,
     load_plan_projection,
     partial_delivery_checked_recently,
     plan_check_banner,
@@ -125,7 +126,7 @@ from plan_selection import (
     validate_selection,
 )
 
-VERSION = "2.32.0"
+VERSION = "2.32.1"
 CONFIG_SCHEMA = "docs-harness/project-config/v13"
 KNOWN_LEGACY_CONFIG_SCHEMAS = {
     f"docs-harness/project-config/v{version}" for version in range(1, 13)
@@ -165,6 +166,7 @@ MANAGED_MODULE_RELATIVE_FILES = (
     "acceptance_assets.py",
     "adr_assets.py",
     "script_hygiene.py",
+    "codemap_check.py",
     "structure_check.py",
     "structure_ts_functions.cjs",
     "usage_log.py",
@@ -4183,7 +4185,7 @@ def command_plan_check(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                 failures.append(
                     f"FAIL: docs/INDEX.md: {basename} 条目须包含 2-4 个关键符号"
                 )
-            entry = entries[0]
+            entry = canonical_index_entry(entries, basename)
             warnings.extend(plan_projection_warnings(relative, entry, banners.get(relative), *load_plan_projection(path.with_suffix(".json"))))
     for basename in archived_names:
         # 同名活文档存在时，活索引条目指向的是活文档（plans/<basename>），不构成归档泄漏；
